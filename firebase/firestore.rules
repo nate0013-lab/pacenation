@@ -1,0 +1,264 @@
+rules_version = '2';
+
+// PaceNation Firestore security rules.
+// Clients write only their own content. Counters, stats, XP, badges,
+// leaderboards, feeds and notifications are written by Cloud Functions
+// (which bypass these rules), so rankings cannot be faked from a device.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function isUser(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+
+    function follows(target) {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(target)/followers/$(request.auth.uid));
+    }
+    // Shared visibility check for profiles and activities.
+    function canSee(ownerId, visibility) {
+      return isUser(ownerId)
+        || (signedIn() && visibility == 'public')
+        || (visibility == 'followers' && follows(ownerId));
+    }
+    function profileVisible(uid) {
+      return canSee(uid, get(/databases/$(database)/documents/users/$(uid)).data.privacy.profileVisibility);
+    }
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function validVisibility(v) { return v in ['public', 'followers', 'private']; }
+    function validPrivacy(p) {
+      return p is map
+        && p.keys().hasOnly(['profileVisibility', 'activityVisibility', 'showOnLeaderboards'])
+        && p.keys().hasAll(['profileVisibility', 'activityVisibility', 'showOnLeaderboards'])
+        && validVisibility(p.profileVisibility)
+        && validVisibility(p.activityVisibility)
+        && p.showOnLeaderboards is bool;
+    }
+    function validCard(d) {
+      return d.username is string
+        && d.usernameLower == d.username.lower()
+        && d.usernameLower.matches('^[a-z0-9_]{3,20}$')
+        && d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 40
+        && d.bio is string && d.bio.size() <= 160
+        && (d.photoURL == null || (d.photoURL is string && d.photoURL.size() < 2048))
+        && validPrivacy(d.privacy);
+    }
+    function ownsUsername(uid, name) {
+      return getAfter(/databases/$(database)/documents/usernames/$(name)).data.uid == uid;
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      // The public card stays readable to signed-in users so people can find
+      // and follow each other. Stats live in /stats and respect privacy.
+      allow read: if signedIn();
+      allow create: if isUser(uid)
+        && request.resource.data.keys().hasOnly(['username', 'usernameLower', 'displayName', 'bio', 'photoURL',
+             'xp', 'level', 'followerCount', 'followingCount', 'privacy', 'createdAt', 'updatedAt'])
+        && validCard(request.resource.data)
+        && request.resource.data.xp == 0
+        && request.resource.data.level == 1
+        && request.resource.data.followerCount == 0
+        && request.resource.data.followingCount == 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && ownsUsername(uid, request.resource.data.usernameLower);
+      allow update: if isUser(uid)
+        && changedOnly(['username', 'usernameLower', 'displayName', 'bio', 'photoURL', 'privacy', 'updatedAt'])
+        && validCard(request.resource.data)
+        && request.resource.data.updatedAt == request.time
+        && ownsUsername(uid, request.resource.data.usernameLower);
+      allow delete: if isUser(uid);
+
+      match /private/{docId} {
+        allow read, delete: if isUser(uid);
+        allow create, update: if isUser(uid) && docId == 'settings'
+          && request.resource.data.keys().hasOnly(['email', 'weightKg', 'units', 'notifications'])
+          && (request.resource.data.weightKg == null
+              || (request.resource.data.weightKg is number
+                  && request.resource.data.weightKg >= 30 && request.resource.data.weightKg <= 250));
+      }
+
+      match /records/{recordId} {
+        allow read: if profileVisible(uid);
+        allow write: if false;
+      }
+      match /badges/{badgeId} {
+        allow read: if profileVisible(uid);
+        allow write: if false;
+      }
+
+      // Follow edges. The follower writes both sides in one batch.
+      match /followers/{followerId} {
+        allow read: if signedIn();
+        allow create: if isUser(followerId) && followerId != uid
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time
+          && existsAfter(/databases/$(database)/documents/users/$(followerId)/following/$(uid));
+        // Unfollow, or the profile owner removing a follower.
+        allow delete: if isUser(followerId) || isUser(uid);
+      }
+      match /following/{targetId} {
+        allow read: if signedIn();
+        allow create: if isUser(uid) && targetId != uid
+          && exists(/databases/$(database)/documents/users/$(targetId))
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time
+          && existsAfter(/databases/$(database)/documents/users/$(targetId)/followers/$(uid));
+        allow delete: if isUser(uid) || isUser(targetId);
+      }
+
+      match /feed/{activityId} {
+        allow read: if isUser(uid);
+        allow write: if false;
+      }
+
+      match /notifications/{notificationId} {
+        allow read, delete: if isUser(uid);
+        allow update: if isUser(uid) && changedOnly(['read']) && request.resource.data.read is bool;
+        allow create: if false;
+      }
+    }
+
+    // Username reservations: one document per lowercase name.
+    match /usernames/{name} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && name.matches('^[a-z0-9_]{3,20}$')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameLower == name;
+      // Released only in the same write that renames or deletes the profile.
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && (!existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+            || getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.usernameLower != name);
+      allow update: if false;
+    }
+
+    // ---------- stats (functions only) ----------
+    match /stats/{uid} {
+      allow read: if profileVisible(uid);
+      allow write: if false;
+    }
+
+    // ---------- activities ----------
+    function validActivity(d) {
+      return d.sport in ['walk', 'run', 'ride']
+        && validVisibility(d.visibility)
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 80
+        && d.distanceM is number && d.distanceM >= 0 && d.distanceM < 1000000
+        && d.movingTimeS is number && d.movingTimeS >= 0 && d.movingTimeS < 172800
+        && d.elapsedTimeS is number && d.elapsedTimeS >= d.movingTimeS
+        && d.startedAt is timestamp && d.endedAt is timestamp && d.endedAt >= d.startedAt
+        && d.endedAt <= request.time + duration.value(5, 'm');
+    }
+    function activityData(activityId) {
+      return get(/databases/$(database)/documents/activities/$(activityId)).data;
+    }
+    function canSeeActivity(activityId) {
+      let a = activityData(activityId);
+      return canSee(a.ownerId, a.visibility);
+    }
+
+    match /activities/{activityId} {
+      allow read: if canSee(resource.data.ownerId, resource.data.visibility);
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && validActivity(request.resource.data)
+        && request.resource.data.likeCount == 0
+        && request.resource.data.commentCount == 0;
+      allow update: if isUser(resource.data.ownerId)
+        && changedOnly(['title', 'visibility', 'description'])
+        && validActivity(request.resource.data)
+        && (!('description' in request.resource.data)
+            || (request.resource.data.description is string && request.resource.data.description.size() <= 1000));
+      allow delete: if isUser(resource.data.ownerId);
+
+      match /routeChunks/{chunkId} {
+        allow read: if canSeeActivity(activityId);
+        allow create: if isUser(activityData(activityId).ownerId)
+          && request.resource.data.keys().hasOnly(['index', 'points'])
+          && request.resource.data.index is int
+          && request.resource.data.points is list
+          && request.resource.data.points.size() <= 500;
+        allow delete: if isUser(activityData(activityId).ownerId);
+        allow update: if false;
+      }
+
+      match /likes/{likerId} {
+        allow read: if canSeeActivity(activityId);
+        allow create: if isUser(likerId) && canSeeActivity(activityId)
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isUser(likerId);
+        allow update: if false;
+      }
+
+      match /comments/{commentId} {
+        allow read: if canSeeActivity(activityId);
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && canSeeActivity(activityId)
+          && request.resource.data.keys().hasOnly(['authorId', 'text', 'createdAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
+          && request.resource.data.createdAt == request.time;
+        allow update: if isUser(resource.data.authorId)
+          && changedOnly(['text'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+        allow delete: if isUser(resource.data.authorId) || isUser(activityData(activityId).ownerId);
+      }
+    }
+
+    // ---------- challenges ----------
+    match /challenges/{challengeId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+
+      match /participants/{participantId} {
+        allow read: if signedIn();
+        allow create: if isUser(participantId)
+          && request.resource.data.keys().hasOnly(['joinedAt', 'progressM', 'displayName', 'photoURL'])
+          && request.resource.data.progressM == 0
+          && request.resource.data.joinedAt == request.time
+          && get(/databases/$(database)/documents/challenges/$(challengeId)).data.endsAt > request.time;
+        allow delete: if isUser(participantId);
+        allow update: if false;
+      }
+    }
+
+    // ---------- leaderboards and badge catalogue (functions and admins) ----------
+    match /leaderboards/{boardId} {
+      allow read: if signedIn();
+      allow write: if false;
+      match /entries/{entryId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+    match /badges/{badgeId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- events ----------
+    match /events/{eventId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+
+      match /registrations/{registrantId} {
+        allow read: if signedIn();
+        allow create: if isUser(registrantId)
+          && request.resource.data.keys().hasOnly(['registeredAt'])
+          && request.resource.data.registeredAt == request.time
+          && get(/databases/$(database)/documents/events/$(eventId)).data.startsAt > request.time;
+        allow delete: if isUser(registrantId);
+        allow update: if false;
+      }
+    }
+  }
+}

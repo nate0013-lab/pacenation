@@ -1,56 +1,67 @@
-# Welcome to your Expo app 👋
+# PaceNation
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Where Every Kilometre Matters.** Compete. Connect. Conquer.
 
-## Get started
+A walking, running and cycling community app for Android and iOS, built with
+Expo (React Native + TypeScript) and Firebase.
 
-1. Install dependencies
+## Status
 
-   ```bash
-   npm install
-   ```
+Stage 1 of 7 (foundation and identity) is complete:
 
-2. Start the app
+- PaceNation brand: P+N logo, Summit Night / Altitude Teal / Sunrise Gold palette, original mountain-trail artwork and icon set
+- Email sign-up, sign-in, forgot password, persistent sessions
+- Profile creation with photo, unique username, bio and optional weight
+- Five-tab navigation: Home, Activity, Challenges, Community, Profile
+- Home dashboard with weekly, monthly and all-time distance, activity count, level and quick-start buttons
+- Live challenge list (weekly and monthly), username search
+- Edit profile, privacy settings, password reset, sign out, delete account
+- Firestore and Storage security rules for the whole data model, with emulator tests
 
-   ```bash
-   npx expo start
-   ```
+See the build plan doc for the remaining stages.
 
-In the output, you'll find options to open the app in a
+## Run it
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Requirements: Node 20+, Java 17+ (for the Firebase emulators).
 
 ```bash
-npm run reset-project
+npm install
+npm --prefix firebase install
+
+# Terminal 1: local Firebase (auth, Firestore, Storage)
+npm run emulators
+
+# Terminal 2: the app, against the emulators
+cp .env.example .env    # set EXPO_PUBLIC_USE_FIREBASE_EMULATOR=1
+npx expo start          # press w for web, or scan the QR code with a development build
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Image picking, GPS and native sign-in need a development build
+(`npx eas-cli@latest build --profile development`) rather than Expo Go.
 
-### Other setup steps
+To use a real Firebase project, fill in `.env` from the Firebase console, then deploy the rules:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+firebase/node_modules/.bin/firebase deploy --only firestore,storage --project <your-project-id>
+```
 
-## Learn more
+## Tests
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run typecheck      # TypeScript
+npm test               # unit tests (Jest)
+npm run test:rules     # Firestore and Storage rules against the emulator
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Layout
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+src/app/            screens (Expo Router: every file is a route)
+  (auth)/           welcome, sign-in, sign-up, forgot-password
+  (tabs)/           home, activity, challenges, community, profile
+  settings/         edit-profile, privacy, account
+  create-profile    first-run profile setup
+src/components/     logo, artwork, icons, UI kit
+src/lib/            Firebase, auth, services, validation, formatting
+firebase/           security rules, indexes, rules tests
+```
