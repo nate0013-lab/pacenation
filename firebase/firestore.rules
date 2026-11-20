@@ -1,9 +1,9 @@
 rules_version = '2';
 
 // PaceNation Firestore security rules.
-// Clients write only their own content. Counters, stats, XP, badges,
-// leaderboards, feeds and notifications are written by Cloud Functions
-// (which bypass these rules), so rankings cannot be faked from a device.
+// Runs on the free Spark plan: no Cloud Functions, so every write comes
+// from a device and these rules are the only line of defence. Clients
+// write only their own content and tightly validated shared counters.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -42,7 +42,10 @@ service cloud.firestore {
         && d.usernameLower.matches('^[a-z0-9_]{3,20}$')
         && d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 40
         && d.bio is string && d.bio.size() <= 160
-        && (d.photoURL == null || (d.photoURL is string && d.photoURL.size() < 2048))
+        // Photos are small JPEG data URLs (free plan, no Cloud Storage) or, later, https URLs.
+        && (d.photoURL == null
+            || (d.photoURL is string && d.photoURL.size() <= 200000
+                && (d.photoURL.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$') || d.photoURL.matches('^https://.*'))))
         && validPrivacy(d.privacy);
     }
     function ownsUsername(uid, name) {
@@ -179,7 +182,8 @@ service cloud.firestore {
 
       match /routeChunks/{chunkId} {
         allow read: if canSeeActivity(activityId);
-        allow create: if isUser(activityData(activityId).ownerId)
+        // getAfter: points are written in the same batch as the activity itself.
+        allow create: if isUser(getAfter(/databases/$(database)/documents/activities/$(activityId)).data.ownerId)
           && request.resource.data.keys().hasOnly(['index', 'points'])
           && request.resource.data.index is int
           && request.resource.data.points is list

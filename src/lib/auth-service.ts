@@ -9,9 +9,8 @@ import {
   signOut as fbSignOut,
 } from 'firebase/auth';
 import { doc, writeBatch } from 'firebase/firestore';
-import { deleteObject, ref } from 'firebase/storage';
 
-import { auth, db, storage } from './firebase';
+import { auth, db } from './firebase';
 
 export async function signUpWithEmail(email: string, password: string) {
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
@@ -35,8 +34,7 @@ export function signOut() {
 
 /**
  * Deletes the signed-in account after confirming the password. Profile
- * documents and the avatar are removed here; activities and social data are
- * cleaned up server-side by the account-deletion function (stage 4).
+ * documents (including the photo, which lives in the profile) are removed here.
  */
 export async function deleteAccount(password: string, usernameLower: string | null) {
   const user = auth.currentUser;
@@ -49,6 +47,5 @@ export async function deleteAccount(password: string, usernameLower: string | nu
   if (usernameLower) batch.delete(doc(db, 'usernames', usernameLower));
   batch.delete(doc(db, 'users', uid));
   await batch.commit();
-  await deleteObject(ref(storage, `avatars/${uid}/avatar.jpg`)).catch(() => undefined);
   await deleteUser(user);
 }

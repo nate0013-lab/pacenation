@@ -65,3 +65,40 @@ export interface UserStats {
 }
 
 export const EMPTY_TOTALS: SportTotals = { distanceM: 0, movingTimeS: 0, count: 0 };
+
+/** `activities/{id}` */
+export interface Activity {
+  id: string;
+  ownerId: string;
+  sport: Sport;
+  title: string;
+  visibility: Visibility;
+  startedAt: Timestamp;
+  endedAt: Timestamp;
+  distanceM: number;
+  movingTimeS: number;
+  elapsedTimeS: number;
+  avgSpeedMps: number;
+  maxSpeedMps: number;
+  avgPaceSPerKm: number | null;
+  elevationGainM: number | null;
+  calories: number;
+  start: { lat: number; lng: number } | null;
+  end: { lat: number; lng: number } | null;
+  /** Simplified route as a Google encoded polyline, for previews. */
+  polyline: string;
+  pointCount: number;
+  likeCount: number;
+  commentCount: number;
+  createdAt: Timestamp | null;
+}
+
+/** A stored GPS point inside `activities/{id}/routeChunks/{n}`. Short keys keep documents small. */
+export interface StoredPoint {
+  la: number;
+  ln: number;
+  al: number | null;
+  t: number;
+  ac: number;
+  sg: number;
+}

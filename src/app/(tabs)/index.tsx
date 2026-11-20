@@ -12,12 +12,13 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useProfile } from '@/lib/auth-context';
 import { formatDistanceKm, greeting } from '@/lib/format';
 import { SPORTS } from '@/lib/types';
-import { useStats } from '@/lib/use-stats';
+import { useMyActivities } from '@/lib/use-stats';
+import { ActivityRow } from '@/components/activity-row';
 
 export default function Home() {
   const router = useRouter();
   const { profile } = useProfile();
-  const { stats } = useStats(profile.uid);
+  const { stats, activities } = useMyActivities(profile.uid);
   const firstName = profile.displayName.split(' ')[0];
 
   return (
@@ -61,12 +62,25 @@ export default function Home() {
       <SectionHeader title="Quick start" />
       <View style={styles.sports}>
         {SPORTS.map((s) => (
-          <SportButton key={s} sport={s} testID={`quick-${s}`} onPress={() => router.navigate({ pathname: '/activity', params: { sport: s } })} />
+          <SportButton key={s} sport={s} testID={`quick-${s}`} onPress={() => router.push({ pathname: '/track', params: { sport: s } })} />
         ))}
       </View>
 
-      <SectionHeader title="Recent activities" />
-      <EmptyState icon="map" title="No activities yet" body="Your walks, runs and rides will show here with their routes once you track them." />
+      <SectionHeader
+        title="Recent activities"
+        action={activities.length > 3 ? <Button title="See all" variant="ghost" onPress={() => router.navigate('/activity')} style={{ minHeight: 32, paddingHorizontal: 0 }} /> : undefined}
+      />
+      {activities.length === 0 ? (
+        <EmptyState icon="map" title="No activities yet" body="Your walks, runs and rides will show here with their routes once you track them." />
+      ) : (
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          {activities.slice(0, 3).map((a, i) => (
+            <View key={a.id} style={i > 0 ? { borderTopWidth: 1, borderTopColor: Colors.border } : undefined}>
+              <ActivityRow a={a} />
+            </View>
+          ))}
+        </Card>
+      )}
 
       <SectionHeader title="Current challenges" />
       <EmptyState icon="challenges" title="You have not joined a challenge" body="Weekly and monthly challenges keep you moving and earn badges.">

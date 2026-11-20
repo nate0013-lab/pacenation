@@ -22,15 +22,12 @@ export interface Challenge {
 
 /** Live list of challenges in a period that have not ended yet, soonest ending first. */
 export function watchOpenChallenges(period: ChallengePeriod, cb: (list: Challenge[]) => void, onError: (e: Error) => void) {
-  const q = query(
-    collection(db, 'challenges'),
-    where('period', '==', period),
-    where('endsAt', '>', Timestamp.now()),
-    orderBy('endsAt', 'asc'),
-  );
+  // Single-field query (no composite index needed); the period is filtered on the device.
+  const q = query(collection(db, 'challenges'), where('endsAt', '>', Timestamp.now()), orderBy('endsAt', 'asc'));
   return onSnapshot(
     q,
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Challenge, 'id'>) }))),
+    (snap) =>
+      cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Challenge, 'id'>) })).filter((c) => c.period === period)),
     onError,
   );
 }

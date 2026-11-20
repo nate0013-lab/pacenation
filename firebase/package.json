@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "firebase emulators:exec --config ../firebase.json --only firestore,storage --project demo-pacenation \"node --test --test-concurrency=1 tests/*.test.mjs\""
+    "test": "firebase emulators:exec --config ../firebase.json --only firestore --project demo-pacenation \"node --test --test-concurrency=1 tests/*.test.mjs\""
   },
   "keywords": [],
   "author": "",

@@ -107,6 +107,13 @@ describe('profiles and usernames', () => {
     await assertFails(createProfile(as('alice'), 'alice', 'alice', { followerCount: 99 }));
   });
 
+  test('profile photos may be small JPEG data URLs or https links only', async () => {
+    const jpeg = 'data:image/jpeg;base64,' + 'A'.repeat(30000);
+    await assertSucceeds(createProfile(as('alice'), 'alice', 'alice', { photoURL: jpeg }));
+    await assertFails(createProfile(as('bob'), 'bob', 'bob', { photoURL: 'javascript:alert(1)' }));
+    await assertFails(createProfile(as('carol'), 'carol', 'carol', { photoURL: 'data:image/jpeg;base64,' + 'A'.repeat(250000) }));
+  });
+
   test('invalid usernames are rejected', async () => {
     await assertFails(createProfile(as('alice'), 'alice', 'a!'));
     await assertFails(createProfile(as('alice'), 'alice', 'ab'));
@@ -257,6 +264,16 @@ describe('activities', () => {
     await assertFails(setDoc(doc(as('bob'), 'activities', 'fake'), activity('alice', 'public')));
     await assertFails(setDoc(doc(as('alice'), 'activities', 'liked'), activity('alice', 'public', { likeCount: 500 })));
     await assertFails(setDoc(doc(as('alice'), 'activities', 'far'), activity('alice', 'public', { distanceM: 5e6 })));
+  });
+
+  test('an activity and its GPS points save together in one batch', async () => {
+    const db = as('alice');
+    const b = writeBatch(db);
+    b.set(doc(db, 'activities', 'batch1'), activity('alice', 'followers'));
+    b.set(doc(db, 'activities', 'batch1', 'routeChunks', '0000'), { index: 0, points: [{ la: 1, ln: 2, al: null, t: 1, ac: 5, sg: 0 }] });
+    await assertSucceeds(b.commit());
+    // nobody else can add points to it
+    await assertFails(setDoc(doc(as('bob'), 'activities', 'batch1', 'routeChunks', '0001'), { index: 1, points: [] }));
   });
 
   test('owners can retitle but not change distance', async () => {
