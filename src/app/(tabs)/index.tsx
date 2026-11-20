@@ -14,11 +14,14 @@ import { formatDistanceKm, greeting } from '@/lib/format';
 import { SPORTS } from '@/lib/types';
 import { useMyActivities } from '@/lib/use-stats';
 import { ActivityRow } from '@/components/activity-row';
+import { BadgeStrip } from '@/components/badge-strip';
+import { DistanceBars } from '@/components/week-bars';
 
 export default function Home() {
   const router = useRouter();
   const { profile } = useProfile();
-  const { stats, activities } = useMyActivities(profile.uid);
+  const { stats, activities, progress } = useMyActivities();
+  const nextBadges = progress.badges.filter((b) => b.earnedAt === null).sort((a, b) => b.ratio - a.ratio).slice(0, 4);
   const firstName = profile.displayName.split(' ')[0];
 
   return (
@@ -50,13 +53,23 @@ export default function Home() {
         </View>
       </Animated.View>
 
+      <Card style={{ marginTop: Spacing.lg }}>
+        <View style={styles.cardHead}>
+          <Text style={[Type.bodyStrong, { color: Colors.text }]}>Last 7 days</Text>
+          <Text style={[Type.small, { color: Colors.textSecondary }]} testID="home-streak">
+            {progress.currentStreak > 0 ? `${progress.currentStreak}-day streak` : 'Start a streak today'}
+          </Text>
+        </View>
+        <DistanceBars testID="home-week-chart" bars={progress.last7Days.map((d) => ({ key: d.key, label: d.label, distanceM: d.distanceM, highlight: d.isToday }))} />
+      </Card>
+
       <View style={styles.grid}>
         <StatTile label="This month" value={formatDistanceKm(stats.month.distanceM)} unit="km" accent={Colors.walk} />
         <StatTile label="All time" value={formatDistanceKm(stats.totals.distanceM)} unit="km" accent={Colors.gold} />
       </View>
       <View style={[styles.grid, { marginTop: Spacing.md }]}>
         <StatTile label="Activities" value={String(stats.totals.count)} accent={Colors.primary} />
-        <StatTile label="Level" value={String(profile.level)} unit={`${profile.xp} XP`} accent={Colors.ride} />
+        <StatTile label="Best streak" value={String(progress.bestStreak)} unit={progress.bestStreak === 1 ? 'day' : 'days'} accent={Colors.ride} />
       </View>
 
       <SectionHeader title="Quick start" />
@@ -87,12 +100,24 @@ export default function Home() {
         <Button title="Browse challenges" variant="secondary" onPress={() => router.navigate('/challenges')} style={{ marginTop: Spacing.sm }} />
       </EmptyState>
 
-      <SectionHeader title="Achievements" />
-      <Card>
-        <LevelBar xp={profile.xp} />
-        <Text style={[Type.small, { color: Colors.textSecondary, marginTop: Spacing.md }]}>
-          Earn XP for every kilometre. Badges you unlock appear on your profile.
-        </Text>
+      <SectionHeader
+        title="Achievements"
+        action={<Button testID="home-badges" title="All badges" variant="ghost" onPress={() => router.push('/badges')} style={{ minHeight: 32, paddingHorizontal: 0 }} />}
+      />
+      <Card style={{ gap: Spacing.lg }}>
+        <LevelBar xp={progress.xp} />
+        {progress.earned.length > 0 ? (
+          <View style={{ gap: Spacing.sm }}>
+            <Text style={[Type.caption, { color: Colors.textSecondary }]}>LATEST BADGES</Text>
+            <BadgeStrip testID="home-latest-badges" badges={progress.earned.slice(0, 6)} />
+          </View>
+        ) : null}
+        {nextBadges.length > 0 ? (
+          <View style={{ gap: Spacing.sm }}>
+            <Text style={[Type.caption, { color: Colors.textSecondary }]}>UP NEXT</Text>
+            <BadgeStrip testID="home-next-badges" badges={nextBadges} />
+          </View>
+        ) : null}
       </Card>
 
       <SectionHeader title="Community" />
@@ -116,4 +141,5 @@ const styles = StyleSheet.create({
   heroSub: { ...Type.small, color: Colors.textSecondary },
   grid: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg },
   sports: { flexDirection: 'row', gap: Spacing.md },
+  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: Spacing.md },
 });

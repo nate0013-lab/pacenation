@@ -6,19 +6,22 @@ import { Icon } from '@/components/icons';
 import { LevelBar } from '@/components/level-bar';
 import { MountainScene } from '@/components/mountain-scene';
 import { SPORT_COLOR } from '@/components/sport-button';
-import { Card, EmptyState, ListRow, Screen, SectionHeader, StatTile } from '@/components/ui';
+import { Button, Card, EmptyState, ListRow, Screen, SectionHeader, StatTile } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useProfile } from '@/lib/auth-context';
 import { formatDistanceKm, formatDuration } from '@/lib/format';
 import { SPORT_LABEL, SPORTS } from '@/lib/types';
-import { useStats } from '@/lib/use-stats';
+import { useMyActivities } from '@/lib/use-stats';
+import { BadgeStrip } from '@/components/badge-strip';
+import { RecordsList } from '@/components/records-list';
+import { DistanceBars } from '@/components/week-bars';
 
 const VIS_LABEL = { public: 'Everyone', followers: 'Followers', private: 'Only me' } as const;
 
 export default function ProfileTab() {
   const router = useRouter();
   const { profile } = useProfile();
-  const { stats } = useStats(profile.uid);
+  const { stats, progress } = useMyActivities();
 
   return (
     <Screen padded={false}>
@@ -51,7 +54,7 @@ export default function ProfileTab() {
         </View>
 
         <Card style={{ marginTop: Spacing.lg }}>
-          <LevelBar xp={profile.xp} />
+          <LevelBar xp={progress.xp} />
         </Card>
 
         <View style={styles.grid}>
@@ -63,13 +66,20 @@ export default function ProfileTab() {
           <StatTile label="Moving time" value={formatDuration(stats.totals.movingTimeS)} accent={Colors.ride} />
         </View>
 
+        <SectionHeader title="Weekly distance" />
+        <Card>
+          <DistanceBars testID="profile-weeks-chart" height={110} bars={progress.last8Weeks.map((w, i) => ({ key: w.key, label: w.label, distanceM: w.distanceM, highlight: i === progress.last8Weeks.length - 1 }))} />
+        </Card>
+
         <SectionHeader title="By sport" />
         <Card style={{ padding: 0 }}>
           {SPORTS.map((s, i) => (
             <View key={s} style={[styles.sportRow, i > 0 && styles.divider]}>
               <Icon name={s} size={24} color={SPORT_COLOR[s]} />
               <Text style={[Type.bodyStrong, { color: Colors.text, flex: 1 }]}>{SPORT_LABEL[s]}</Text>
-              <Text style={[Type.small, { color: Colors.textSecondary }]}>{stats.bySport[s].count} activities</Text>
+              <Text style={[Type.small, { color: Colors.textSecondary }]}>
+                {stats.bySport[s].count} · {formatDuration(stats.bySport[s].movingTimeS)}
+              </Text>
               <Text style={[Type.bodyStrong, { color: Colors.text, minWidth: 72, textAlign: 'right' }]}>
                 {formatDistanceKm(stats.bySport[s].distanceM)} km
               </Text>
@@ -78,10 +88,25 @@ export default function ProfileTab() {
         </Card>
 
         <SectionHeader title="Personal records" />
-        <EmptyState icon="trophy" title="No records yet" body="Your fastest 1 km, 5 km and 10 km and your longest ride will be tracked here." />
+        {progress.records.length ? (
+          <RecordsList records={progress.records} />
+        ) : (
+          <EmptyState icon="trophy" title="No records yet" body="Your fastest 1 km, 5 km and 10 km and your longest walk, run and ride will be tracked here." />
+        )}
 
-        <SectionHeader title="Badges" />
-        <EmptyState icon="shield" title="No badges yet" body="Complete challenges and hit milestones to unlock badges." />
+        <SectionHeader
+          title="Badges"
+          action={<Button testID="profile-badges" title={`See all ${progress.earned.length}/${progress.badges.length}`} variant="ghost" onPress={() => router.push('/badges')} style={{ minHeight: 32, paddingHorizontal: 0 }} />}
+        />
+        {progress.earned.length ? (
+          <Card>
+            <BadgeStrip testID="profile-badge-strip" badges={progress.earned} />
+          </Card>
+        ) : (
+          <EmptyState icon="shield" title="No badges yet" body="Save your first activity to earn First Steps. Distance, streak and climbing badges follow.">
+            <Button title="View all badges" variant="secondary" onPress={() => router.push('/badges')} style={{ marginTop: Spacing.sm }} />
+          </EmptyState>
+        )}
 
         <SectionHeader title="Settings" />
         <Card style={{ padding: 0, overflow: 'hidden' }}>

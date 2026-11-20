@@ -49,8 +49,4 @@ export function monthKey(date: Date): string {
 }
 
 /** XP needed to reach a level: 1000 XP per level, levels start at 1. */
-export function levelForXp(xp: number): { level: number; intoLevel: number; perLevel: number } {
-  const perLevel = 1000;
-  const level = Math.floor(Math.max(0, xp) / perLevel) + 1;
-  return { level, intoLevel: Math.max(0, xp) % perLevel, perLevel };
-}
+export { levelForXp } from './progress/xp';

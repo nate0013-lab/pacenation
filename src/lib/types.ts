@@ -56,7 +56,7 @@ export interface SportTotals {
   count: number;
 }
 
-/** `stats/{uid}`: written by Cloud Functions as activities are saved. */
+/** Totals summed from activities; the public copy lives in `stats/{uid}`. */
 export interface UserStats {
   totals: SportTotals;
   bySport: Record<Sport, SportTotals>;
@@ -88,6 +88,8 @@ export interface Activity {
   /** Simplified route as a Google encoded polyline, for previews. */
   polyline: string;
   pointCount: number;
+  /** Fastest moving time (s) over set distances inside this activity, such as `{ '1k': 290, '5k': 1530 }`. */
+  bestEfforts?: Partial<Record<string, number>>;
   likeCount: number;
   commentCount: number;
   createdAt: Timestamp | null;

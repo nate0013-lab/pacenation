@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LogoMark } from '@/components/logo';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { MyActivitiesProvider } from '@/lib/use-stats';
 // Registers the background location task at start-up and restores an unfinished activity.
 import { restoreSession } from '@/lib/tracking/store';
 
@@ -57,8 +58,10 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="light" />
-        <AuthGate />
+        <MyActivitiesProvider>
+          <StatusBar style="light" />
+          <AuthGate />
+        </MyActivitiesProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

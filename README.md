@@ -7,7 +7,7 @@ Expo (React Native + TypeScript) and Firebase.
 
 ## Status
 
-Stages 1 to 3 of 7 are built. Stage 1 (foundation and identity):
+Stages 1 to 4 of 7 are built. Stage 1 (foundation and identity):
 
 - PaceNation brand: P+N logo, Summit Night / Altitude Teal / Sunrise Gold palette, original mountain-trail artwork and icon set
 - Email sign-up, sign-in, forgot password, persistent sessions
@@ -33,6 +33,15 @@ Stage 3 (activity detail):
 - Start and finish markers, per-kilometre splits, elevation profile when the phone recorded altitude
 - Download the route as a GPX file (share sheet on phones, file download on web)
 - Share an activity summary, rename it and change who can see it
+
+Stage 4 (progress):
+
+- XP for every activity (distance, climbing and badges) and levels with titles, from Trailhead to Apex
+- 24 original badges in bronze, silver and gold across milestones, distance, consistency and exploring
+- Personal records: fastest 1 km, 5 km, 10 km, half and full marathon runs, ride efforts, longest walk, run and ride, biggest climb
+- Home: last 7 days chart, streaks, latest badges and the badges you are closest to
+- Profile: weekly distance chart, stats by sport, records and badges; a full badges screen with progress
+- Everything is worked out on the phone from saved activities; the public summary is kept in `stats/{uid}`
 
 ## Firebase plan
 
