@@ -16,15 +16,20 @@ export interface StatsSummary extends UserStats {
   bestStreak: number;
 }
 
-export function summaryDoc(p: Progress): StatsSummary {
+/**
+ * The shared summary. XP, level and badges cover everything; distance totals,
+ * streaks and records leave out "Only me" activities, so a private activity
+ * never shows up on someone else's screen, not even as a number in a total.
+ */
+export function summaryDoc(p: Progress, shared: Progress = p): StatsSummary {
   return {
-    ...p.stats,
+    ...shared.stats,
     xp: p.xp,
     level: p.level,
     badges: Object.fromEntries(p.earned.map((b) => [b.badge.id, b.earnedAt!])),
-    records: Object.fromEntries(p.records.map((r) => [r.key, Math.round(r.value)])),
-    currentStreak: p.currentStreak,
-    bestStreak: p.bestStreak,
+    records: Object.fromEntries(shared.records.map((r) => [r.key, Math.round(r.value)])),
+    currentStreak: shared.currentStreak,
+    bestStreak: shared.bestStreak,
   };
 }
 

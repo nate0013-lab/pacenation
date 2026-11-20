@@ -102,24 +102,47 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Follow edges. The follower writes both sides in one batch.
+      // Follow edges, always written as a pair in one batch. Public profiles can be
+      // followed straight away; other profiles need an approved follow request, and
+      // then the profile owner writes both edges while removing the request.
       match /followers/{followerId} {
         allow read: if signedIn();
-        allow create: if isUser(followerId) && followerId != uid
+        allow create: if followerId != uid
           && request.resource.data.keys().hasOnly(['createdAt'])
           && request.resource.data.createdAt == request.time
-          && existsAfter(/databases/$(database)/documents/users/$(followerId)/following/$(uid));
+          && existsAfter(/databases/$(database)/documents/users/$(followerId)/following/$(uid))
+          && (
+            (isUser(followerId)
+              && get(/databases/$(database)/documents/users/$(uid)).data.privacy.profileVisibility == 'public')
+            || (isUser(uid)
+              && exists(/databases/$(database)/documents/users/$(uid)/followRequests/$(followerId))
+              && !existsAfter(/databases/$(database)/documents/users/$(uid)/followRequests/$(followerId)))
+          );
         // Unfollow, or the profile owner removing a follower.
         allow delete: if isUser(followerId) || isUser(uid);
+        allow update: if false;
       }
       match /following/{targetId} {
         allow read: if signedIn();
-        allow create: if isUser(uid) && targetId != uid
-          && exists(/databases/$(database)/documents/users/$(targetId))
+        // The followers rule above decides whether the pair is allowed.
+        allow create: if (isUser(uid) || isUser(targetId)) && targetId != uid
           && request.resource.data.keys().hasOnly(['createdAt'])
           && request.resource.data.createdAt == request.time
           && existsAfter(/databases/$(database)/documents/users/$(targetId)/followers/$(uid));
         allow delete: if isUser(uid) || isUser(targetId);
+        allow update: if false;
+      }
+      // Requests to follow a profile that is not public. Only the two people involved see them.
+      match /followRequests/{requesterId} {
+        allow read: if isUser(uid) || isUser(requesterId);
+        allow create: if isUser(requesterId) && requesterId != uid
+          && exists(/databases/$(database)/documents/users/$(uid))
+          && !exists(/databases/$(database)/documents/users/$(uid)/followers/$(requesterId))
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time;
+        // Cancelled by the requester, or approved or declined by the owner.
+        allow delete: if isUser(uid) || isUser(requesterId);
+        allow update: if false;
       }
 
       match /feed/{activityId} {

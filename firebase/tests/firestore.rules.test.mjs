@@ -8,7 +8,12 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   Timestamp,
+  collection,
   deleteDoc,
+  getCountFromServer,
+  getDocs,
+  query,
+  where,
   doc,
   getDoc,
   serverTimestamp,
@@ -249,27 +254,112 @@ describe('follows', () => {
     await seed(async (db) => {
       await setDoc(doc(db, 'users', 'alice'), { ...card('alice'), createdAt: null, updatedAt: null });
       await setDoc(doc(db, 'users', 'bob'), { ...card('bob'), createdAt: null, updatedAt: null });
+      await setDoc(doc(db, 'users', 'priya'), { ...card('priya'), privacy: { ...PRIVACY, profileVisibility: 'followers' }, createdAt: null, updatedAt: null });
     });
   });
+  const follow = (db, me, target) => {
+    const b = writeBatch(db);
+    b.set(doc(db, 'users', me, 'following', target), { createdAt: serverTimestamp() });
+    b.set(doc(db, 'users', target, 'followers', me), { createdAt: serverTimestamp() });
+    return b.commit();
+  };
 
-  test('following writes both edges in one batch', async () => {
+  test('public profiles: following writes both edges in one batch', async () => {
+    await assertSucceeds(follow(as('bob'), 'bob', 'alice'));
+    // and unfollowing removes both
     const db = as('bob');
     const b = writeBatch(db);
-    b.set(doc(db, 'users', 'bob', 'following', 'alice'), { createdAt: serverTimestamp() });
-    b.set(doc(db, 'users', 'alice', 'followers', 'bob'), { createdAt: serverTimestamp() });
+    b.delete(doc(db, 'users', 'bob', 'following', 'alice'));
+    b.delete(doc(db, 'users', 'alice', 'followers', 'bob'));
     await assertSucceeds(b.commit());
   });
 
+  test('a single edge on its own is refused', async () => {
+    await assertFails(setDoc(doc(as('bob'), 'users', 'alice', 'followers', 'bob'), { createdAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'following', 'alice'), { createdAt: serverTimestamp() }));
+  });
+
   test('cannot add a follower edge on behalf of someone else', async () => {
-    await assertFails(setDoc(doc(as('mallory'), 'users', 'alice', 'followers', 'bob'), { createdAt: serverTimestamp() }));
+    await assertFails(follow(as('mallory'), 'bob', 'alice'));
   });
 
   test('cannot follow yourself', async () => {
-    const db = as('bob');
+    await assertFails(follow(as('bob'), 'bob', 'bob'));
+  });
+
+  test('profiles that are not public need an approved request', async () => {
+    await assertFails(follow(as('bob'), 'bob', 'priya'));
+    await assertSucceeds(setDoc(doc(as('bob'), 'users', 'priya', 'followRequests', 'bob'), { createdAt: serverTimestamp() }));
+    // the requester cannot approve their own request
+    const sneaky = as('bob');
+    const s1 = writeBatch(sneaky);
+    s1.set(doc(sneaky, 'users', 'bob', 'following', 'priya'), { createdAt: serverTimestamp() });
+    s1.set(doc(sneaky, 'users', 'priya', 'followers', 'bob'), { createdAt: serverTimestamp() });
+    s1.delete(doc(sneaky, 'users', 'priya', 'followRequests', 'bob'));
+    await assertFails(s1.commit());
+    // the owner approves: both edges plus removing the request
+    const db = as('priya');
     const b = writeBatch(db);
-    b.set(doc(db, 'users', 'bob', 'following', 'bob'), { createdAt: serverTimestamp() });
-    b.set(doc(db, 'users', 'bob', 'followers', 'bob'), { createdAt: serverTimestamp() });
+    b.set(doc(db, 'users', 'bob', 'following', 'priya'), { createdAt: serverTimestamp() });
+    b.set(doc(db, 'users', 'priya', 'followers', 'bob'), { createdAt: serverTimestamp() });
+    b.delete(doc(db, 'users', 'priya', 'followRequests', 'bob'));
+    await assertSucceeds(b.commit());
+  });
+
+  test('approval without a request is refused', async () => {
+    const db = as('priya');
+    const b = writeBatch(db);
+    b.set(doc(db, 'users', 'bob', 'following', 'priya'), { createdAt: serverTimestamp() });
+    b.set(doc(db, 'users', 'priya', 'followers', 'bob'), { createdAt: serverTimestamp() });
     await assertFails(b.commit());
+  });
+
+  test('requests are visible only to the two people involved', async () => {
+    await setDoc(doc(as('bob'), 'users', 'priya', 'followRequests', 'bob'), { createdAt: serverTimestamp() });
+    await assertSucceeds(getDoc(doc(as('priya'), 'users', 'priya', 'followRequests', 'bob')));
+    await assertSucceeds(getDoc(doc(as('bob'), 'users', 'priya', 'followRequests', 'bob')));
+    await assertFails(getDoc(doc(as('alice'), 'users', 'priya', 'followRequests', 'bob')));
+    await assertFails(setDoc(doc(as('alice'), 'users', 'priya', 'followRequests', 'bob'), { createdAt: serverTimestamp() }));
+    await assertSucceeds(deleteDoc(doc(as('priya'), 'users', 'priya', 'followRequests', 'bob')));
+  });
+
+  test('the profile owner can remove a follower', async () => {
+    await follow(as('bob'), 'bob', 'alice');
+    const db = as('alice');
+    const b = writeBatch(db);
+    b.delete(doc(db, 'users', 'alice', 'followers', 'bob'));
+    b.delete(doc(db, 'users', 'bob', 'following', 'alice'));
+    await assertSucceeds(b.commit());
+  });
+});
+
+describe('feed queries', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'activities', 'pub'), activity('alice', 'public'));
+      await setDoc(doc(db, 'activities', 'fol'), activity('alice', 'followers'));
+      await setDoc(doc(db, 'activities', 'priv'), activity('alice', 'private'));
+      await setDoc(doc(db, 'users', 'alice', 'followers', 'carol'), { createdAt: Timestamp.now() });
+    });
+  });
+  const visible = (db, owner, vis) => getDocs(query(collection(db, 'activities'), where('ownerId', '==', owner), where('visibility', 'in', vis)));
+
+  test('a follower can list public and followers-only activities', async () => {
+    const snap = await assertSucceeds(visible(as('carol'), 'alice', ['public', 'followers']));
+    if (snap.size !== 2) throw new Error('expected 2, got ' + snap.size);
+  });
+  test('a stranger can list public activities only', async () => {
+    await assertSucceeds(visible(as('bob'), 'alice', ['public']));
+    await assertFails(visible(as('bob'), 'alice', ['public', 'followers']));
+  });
+  test('nobody else can list private activities', async () => {
+    await assertFails(visible(as('carol'), 'alice', ['private']));
+    await assertFails(getDocs(query(collection(as('carol'), 'activities'), where('ownerId', '==', 'alice'))));
+  });
+  test('likes and comments can be counted by anyone who can see the activity', async () => {
+    await assertSucceeds(getCountFromServer(collection(as('bob'), 'activities', 'pub', 'likes')));
+    await assertFails(getCountFromServer(collection(as('bob'), 'activities', 'fol', 'likes')));
+    await assertSucceeds(getCountFromServer(collection(as('carol'), 'activities', 'fol', 'comments')));
   });
 });
 
