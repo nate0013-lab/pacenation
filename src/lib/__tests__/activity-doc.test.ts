@@ -35,3 +35,16 @@ describe('buildActivityDoc', () => {
     expect(fromStored(toStored(p))).toEqual({ lat: 51.123457, lng: -0.765432, alt: 12.3, t: 5, acc: 4.6, seg: 2 });
   });
 });
+
+import { shareText } from '../activities-service';
+
+describe('shareText', () => {
+  test('summarises runs and rides', () => {
+    expect(shareText({ title: 'Lakeside tempo', sport: 'run', distanceM: 5230, movingTimeS: 1512, avgPaceSPerKm: 289, avgSpeedMps: 3.46, elevationGainM: 42 })).toBe(
+      'Lakeside tempo: I ran 5.23 km in 25:12 (4:49 /km average pace, 42 m climbed) on PaceNation. Where Every Kilometre Matters.',
+    );
+    expect(shareText({ title: 'Coast', sport: 'ride', distanceM: 40000, movingTimeS: 4800, avgPaceSPerKm: 120, avgSpeedMps: 8.33, elevationGainM: null })).toBe(
+      'Coast: I rode 40.00 km in 80:00 (30.0 km/h average) on PaceNation. Where Every Kilometre Matters.',
+    );
+  });
+});

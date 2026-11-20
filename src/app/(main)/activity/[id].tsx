@@ -1,22 +1,32 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { formatActivityDate } from '@/components/activity-row';
 import { Icon } from '@/components/icons';
-import { RouteMap } from '@/components/route-map';
+import { ElevationChart } from '@/components/elevation-chart';
+import { RouteReplay } from '@/components/route-replay';
+import { SplitsTable } from '@/components/splits-table';
 import { ScreenHeader } from '@/components/screen-header';
 import { SPORT_COLOR } from '@/components/sport-button';
-import { Banner, Button, Card, EmptyState, Screen, StatTile } from '@/components/ui';
+import { Banner, Button, Card, EmptyState, Screen, SectionHeader, Segmented, StatTile, TextField } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
-import { deleteActivity, getActivity, getRoute } from '@/lib/activities-service';
+import { deleteActivity, getActivity, getRoute, shareText, updateActivityDetails } from '@/lib/activities-service';
+import { exportGpx } from '@/lib/export-route';
 import { useProfile } from '@/lib/auth-context';
 import { formatDistanceKm, formatDuration, formatPace, formatSpeedKmh } from '@/lib/format';
 import type { TrackPoint } from '@/lib/tracking/geo';
-import { SPORT_LABEL, type Activity } from '@/lib/types';
+import { elevationProfile, gpxFileName, kmSplits, toGpx } from '@/lib/tracking/route-tools';
+import { useMemo } from 'react';
+import { SPORT_LABEL, type Activity, type Visibility } from '@/lib/types';
 
 const VIS_LABEL = { public: 'Everyone', followers: 'Followers', private: 'Only me' } as const;
+const VIS_OPTIONS: { value: Visibility; label: string }[] = [
+  { value: 'public', label: 'Everyone' },
+  { value: 'followers', label: 'Followers' },
+  { value: 'private', label: 'Only me' },
+];
 
 export default function ActivityDetail() {
   const { id, saved } = useLocalSearchParams<{ id: string; saved?: string }>();
@@ -27,6 +37,13 @@ export default function ActivityDetail() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftVis, setDraftVis] = useState<Visibility>('followers');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const splits = useMemo(() => kmSplits(route), [route]);
+  const profile3 = useMemo(() => elevationProfile(route), [route]);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +71,50 @@ export default function ActivityDetail() {
     } catch {
       setError('Could not delete. Check your connection and try again.');
       setDeleting(false);
+    }
+  }
+
+  async function share() {
+    if (!activity) return;
+    setNotice(null);
+    try {
+      await Share.share({ message: shareText(activity), title: activity.title });
+    } catch {
+      setNotice('Sharing is not available here. Use Download route to save the GPX file instead.');
+    }
+  }
+
+  async function download() {
+    if (!activity) return;
+    setNotice(null);
+    try {
+      const startedAt = activity.startedAt.toMillis();
+      const res = await exportGpx(gpxFileName(activity.title, startedAt), toGpx({ title: activity.title, sport: activity.sport, startedAt }, route));
+      if (res === 'downloaded') setNotice('Route downloaded as a GPX file.');
+    } catch (e) {
+      setError(e instanceof Error && e.message.startsWith('PN:') ? e.message.slice(3) : 'Could not export the route.');
+    }
+  }
+
+  function startEdit() {
+    if (!activity) return;
+    setDraftTitle(activity.title);
+    setDraftVis(activity.visibility);
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!activity) return;
+    setSavingEdit(true);
+    try {
+      await updateActivityDetails(activity.id, { title: draftTitle, visibility: draftVis });
+      setActivity({ ...activity, title: draftTitle.trim().slice(0, 80) || 'Activity', visibility: draftVis });
+      setEditing(false);
+      setNotice('Changes saved.');
+    } catch {
+      setError('Could not save changes. Check your connection and try again.');
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -94,7 +155,9 @@ export default function ActivityDetail() {
         </View>
       </View>
 
-      <RouteMap points={route} color={color} height={280} style={{ marginTop: Spacing.lg }} />
+      <View style={{ marginTop: Spacing.lg }}>
+        <RouteReplay points={route} color={color} height={300} />
+      </View>
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: Colors.success }]} />
@@ -105,6 +168,12 @@ export default function ActivityDetail() {
           <Text style={[Type.small, { color: Colors.textSecondary }]}>Finish</Text>
         </View>
       </View>
+
+      <View style={styles.actions}>
+        <Button testID="activity-share" title="Share" icon="community" variant="secondary" onPress={share} style={{ flex: 1 }} />
+        <Button testID="activity-download" title="Download route" icon="map" variant="secondary" onPress={download} disabled={route.length < 2} style={{ flex: 1 }} />
+      </View>
+      {notice ? <Banner kind="success" text={notice} /> : null}
 
       <View style={styles.grid}>
         <StatTile label="Distance" value={formatDistanceKm(a.distanceM)} unit="km" accent={color} />
@@ -124,7 +193,38 @@ export default function ActivityDetail() {
         <Row label="GPS points" value={String(a.pointCount)} />
       </Card>
 
+      {splits.length ? (
+        <>
+          <SectionHeader title="Splits" />
+          <Card>
+            <SplitsTable splits={splits} color={color} />
+          </Card>
+        </>
+      ) : null}
+
+      <SectionHeader title="Elevation" />
+      <Card>
+        {profile3 ? (
+          <ElevationChart data={profile3} />
+        ) : (
+          <Text style={[Type.small, { color: Colors.textSecondary }]}>This device did not record altitude for this activity.</Text>
+        )}
+      </Card>
+
       {error ? <Banner kind="error" text={error} /> : null}
+      {isOwner ? (
+        editing ? (
+          <Card style={{ gap: Spacing.md, marginTop: Spacing.xl }}>
+            <TextField testID="activity-edit-title" label="Title" value={draftTitle} onChangeText={setDraftTitle} maxLength={80} />
+            <Text style={[Type.caption, { color: Colors.textSecondary }]}>WHO CAN SEE IT</Text>
+            <Segmented options={VIS_OPTIONS} value={draftVis} onChange={setDraftVis} />
+            <Button testID="activity-edit-save" title="Save changes" onPress={saveEdit} loading={savingEdit} />
+            <Button title="Cancel" variant="ghost" onPress={() => setEditing(false)} />
+          </Card>
+        ) : (
+          <Button testID="activity-edit" title="Edit title and visibility" variant="secondary" onPress={startEdit} style={{ marginTop: Spacing.xl }} />
+        )
+      ) : null}
       {isOwner ? (
         <Button
           testID="activity-delete"
@@ -132,7 +232,7 @@ export default function ActivityDetail() {
           variant="danger"
           onPress={remove}
           loading={deleting}
-          style={{ marginTop: Spacing.xl }}
+          style={{ marginTop: Spacing.md }}
         />
       ) : null}
     </Screen>
@@ -155,4 +255,5 @@ const styles = StyleSheet.create({
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   grid: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
   kv: { flexDirection: 'row', justifyContent: 'space-between' },
+  actions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg, marginBottom: Spacing.sm },
 });

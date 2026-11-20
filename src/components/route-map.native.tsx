@@ -20,7 +20,7 @@ const DARK_STYLE: MapStyleElement[] = [
 
 const toCoord = (p: { lat: number; lng: number }) => ({ latitude: p.lat, longitude: p.lng });
 
-export function RouteMap({ points, current, follow = false, showEndpoints = true, color = Colors.primary, height = 240, style, interactive = true }: RouteMapProps) {
+export function RouteMap({ points, current, follow = false, showEndpoints = true, color = Colors.primary, height = 240, style, interactive = true, highlight, marker }: RouteMapProps) {
   const map = useRef<MapView>(null);
   const coords = points.map(toCoord);
 
@@ -59,7 +59,19 @@ export function RouteMap({ points, current, follow = false, showEndpoints = true
             map.current?.fitToCoordinates(coords, { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: false });
           }
         }}>
-        {coords.length > 1 ? <Polyline coordinates={coords} strokeColor={color} strokeWidth={5} lineJoin="round" lineCap="round" /> : null}
+        {coords.length > 1 ? (
+          <Polyline coordinates={coords} strokeColor={highlight ? `${color}59` : color} strokeWidth={5} lineJoin="round" lineCap="round" />
+        ) : null}
+        {highlight && highlight.length > 1 ? (
+          <Polyline coordinates={highlight.map(toCoord)} strokeColor={color} strokeWidth={6} lineJoin="round" lineCap="round" zIndex={2} />
+        ) : null}
+        {marker ? (
+          <Marker coordinate={toCoord(marker)} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={3}>
+            <View style={styles.replayHalo}>
+              <View style={styles.replayDot} />
+            </View>
+          </Marker>
+        ) : null}
         {showEndpoints && coords[0] ? <Marker coordinate={coords[0]} pinColor={Colors.success} title="Start" /> : null}
         {showEndpoints && !current && coords.length > 1 ? <Marker coordinate={coords[coords.length - 1]} pinColor={Colors.danger} title="Finish" /> : null}
         {current ? (
@@ -77,5 +89,7 @@ export function RouteMap({ points, current, follow = false, showEndpoints = true
 const styles = StyleSheet.create({
   wrap: { width: '100%', borderRadius: Radius.lg, overflow: 'hidden', backgroundColor: Colors.surface },
   dotHalo: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(77,163,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  replayHalo: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,201,74,0.3)', alignItems: 'center', justifyContent: 'center' },
+  replayDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.gold, borderWidth: 2.5, borderColor: Colors.bg },
   dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#4DA3FF', borderWidth: 2.5, borderColor: '#fff' },
 });
