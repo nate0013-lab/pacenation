@@ -10,6 +10,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -171,4 +172,24 @@ export async function deleteActivity(id: string): Promise<void> {
   chunks.docs.forEach((c) => batch.delete(c.ref));
   batch.delete(doc(db, 'activities', id));
   await batch.commit();
+}
+
+export async function updateActivityDetails(id: string, patch: { title: string; visibility: Visibility }): Promise<void> {
+  await updateDoc(doc(db, 'activities', id), { title: patch.title.trim().slice(0, 80) || 'Activity', visibility: patch.visibility });
+}
+
+/** Plain-text summary for the share sheet. */
+export function shareText(a: Pick<Activity, 'title' | 'sport' | 'distanceM' | 'movingTimeS' | 'avgPaceSPerKm' | 'avgSpeedMps' | 'elevationGainM'>): string {
+  const km = (a.distanceM / 1000).toFixed(2);
+  const mins = Math.floor(a.movingTimeS / 60);
+  const secs = String(Math.round(a.movingTimeS % 60)).padStart(2, '0');
+  const verb = a.sport === 'walk' ? 'walked' : a.sport === 'run' ? 'ran' : 'rode';
+  const effort =
+    a.sport === 'ride'
+      ? `${(a.avgSpeedMps * 3.6).toFixed(1)} km/h average`
+      : a.avgPaceSPerKm
+        ? `${Math.floor(a.avgPaceSPerKm / 60)}:${String(Math.round(a.avgPaceSPerKm % 60)).padStart(2, '0')} /km average pace`
+        : '';
+  const climb = a.elevationGainM ? `, ${a.elevationGainM} m climbed` : '';
+  return `${a.title}: I ${verb} ${km} km in ${mins}:${secs}${effort ? ` (${effort}${climb})` : climb ? ` (${climb.slice(2)})` : ''} on PaceNation. Where Every Kilometre Matters.`;
 }

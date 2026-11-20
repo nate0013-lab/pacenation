@@ -67,7 +67,8 @@
         {
           "photosPermission": "PaceNation lets you choose a profile picture from your photos."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -9,7 +9,7 @@ import type { RouteMapProps } from './route-map.types';
  * Web and fallback route view: the route projected onto a styled grid.
  * Android and iOS use the native map in route-map.native.tsx.
  */
-export function RouteMap({ points, current, showEndpoints = true, color = Colors.primary, height = 240, style }: RouteMapProps) {
+export function RouteMap({ points, current, showEndpoints = true, color = Colors.primary, height = 240, style, highlight, marker }: RouteMapProps) {
   const all = current ? [...points, current] : points;
   const b = boundsOf(all);
   const W = 400;
@@ -29,6 +29,9 @@ export function RouteMap({ points, current, showEndpoints = true, color = Colors
   const first = pts[0];
   const last = pts[pts.length - 1];
   const cur = current ? project(current) : null;
+  const hl = highlight ? highlight.map(project) : null;
+  const mk = marker ? project(marker) : null;
+  const line = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x},${p.y}`).join(' ');
   return (
     <View style={[styles.wrap, { height }, style]} accessibilityLabel="Route map">
       <Svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
@@ -42,12 +45,19 @@ export function RouteMap({ points, current, showEndpoints = true, color = Colors
         <Rect x="0" y="0" width={W} height={H} fill="url(#rmGrid)" />
         {pts.length > 1 ? (
           <>
-            <Polyline points={pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={color} strokeOpacity={0.25} strokeWidth={10} strokeLinejoin="round" strokeLinecap="round" />
-            <Polyline points={pts.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={color} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
+            <Polyline points={line(pts)} fill="none" stroke={color} strokeOpacity={hl ? 0.12 : 0.25} strokeWidth={10} strokeLinejoin="round" strokeLinecap="round" />
+            <Polyline points={line(pts)} fill="none" stroke={color} strokeOpacity={hl ? 0.35 : 1} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
+            {hl && hl.length > 1 ? <Polyline points={line(hl)} fill="none" stroke={color} strokeWidth={5} strokeLinejoin="round" strokeLinecap="round" /> : null}
           </>
         ) : null}
         {showEndpoints && first ? <Circle cx={first.x} cy={first.y} r={7} fill={Colors.success} stroke={Colors.bg} strokeWidth={2.5} /> : null}
         {showEndpoints && last && pts.length > 1 && !cur ? <Circle cx={last.x} cy={last.y} r={7} fill={Colors.danger} stroke={Colors.bg} strokeWidth={2.5} /> : null}
+        {mk ? (
+          <>
+            <Circle cx={mk.x} cy={mk.y} r={14} fill={Colors.gold} opacity={0.3} />
+            <Circle cx={mk.x} cy={mk.y} r={7} fill={Colors.gold} stroke={Colors.bg} strokeWidth={2.5} />
+          </>
+        ) : null}
         {cur ? (
           <>
             <Circle cx={cur.x} cy={cur.y} r={16} fill="#4DA3FF" opacity={0.25} />

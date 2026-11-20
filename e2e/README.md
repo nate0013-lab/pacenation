@@ -9,7 +9,7 @@ EXPO_PUBLIC_USE_FIREBASE_EMULATOR=1 EXPO_PUBLIC_EMULATOR_HOST=127.0.0.1 \
 node e2e/serve.js "$PWD/dist" 8082 &                # serve the build
 mkdir -p e2e/out
 node e2e/accounts.e2e.js e2e/out                    # sign-up, profile, tabs, privacy, sign-in, delete account
-node e2e/tracking.e2e.js e2e/out                    # GPS tracking with simulated positions, save, history, delete
+node e2e/tracking.e2e.js e2e/out                    # GPS tracking, save, replay, GPX download, edit, history, delete
 ```
 
 Screenshots land in the folder you pass. Playwright must be installed (`npm i -D playwright`).

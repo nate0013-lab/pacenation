@@ -13,4 +13,8 @@ export interface RouteMapProps {
   height?: number;
   style?: ViewStyle;
   interactive?: boolean;
+  /** Replay: the travelled part of the route, drawn bright over a dimmed full route. */
+  highlight?: LatLng[] | null;
+  /** Replay: the moving athlete marker. */
+  marker?: LatLng | null;
 }
