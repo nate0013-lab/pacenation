@@ -1,3 +1,4 @@
+import { bestEfforts } from './progress/best-efforts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Timestamp,
@@ -77,6 +78,7 @@ export function buildActivityDoc(d: ActivityDraft) {
     end: last ? { lat: last.lat, lng: last.lng } : null,
     polyline: encodePolyline(preview),
     pointCount: s.points.length,
+    bestEfforts: bestEfforts(s.points, s.sport),
     likeCount: 0,
     commentCount: 0,
   };

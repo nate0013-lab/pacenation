@@ -28,6 +28,14 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
     function validVisibility(v) { return v in ['public', 'followers', 'private']; }
+    // XP and level are worked out on the device from saved activities. The level
+    // must match the XP: reaching level L takes 125 * (L - 1) * (L + 2) XP.
+    function validXp(d) {
+      return d.xp is int && d.xp >= 0 && d.xp <= 50000000
+        && d.level is int && d.level >= 1 && d.level <= 1000
+        && 125 * (d.level - 1) * (d.level + 2) <= d.xp
+        && d.xp < 125 * d.level * (d.level + 3);
+    }
     function validPrivacy(p) {
       return p is map
         && p.keys().hasOnly(['profileVisibility', 'activityVisibility', 'showOnLeaderboards'])
@@ -69,8 +77,9 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && ownsUsername(uid, request.resource.data.usernameLower);
       allow update: if isUser(uid)
-        && changedOnly(['username', 'usernameLower', 'displayName', 'bio', 'photoURL', 'privacy', 'updatedAt'])
+        && changedOnly(['username', 'usernameLower', 'displayName', 'bio', 'photoURL', 'privacy', 'xp', 'level', 'updatedAt'])
         && validCard(request.resource.data)
+        && validXp(request.resource.data)
         && request.resource.data.updatedAt == request.time
         && ownsUsername(uid, request.resource.data.usernameLower);
       allow delete: if isUser(uid);
@@ -141,10 +150,24 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // ---------- stats (functions only) ----------
+    // ---------- stats ----------
+    // Public summary of a user's activities (totals, XP, badges, records),
+    // kept up to date by the owner's device whenever their activities change.
     match /stats/{uid} {
       allow read: if profileVisible(uid);
-      allow write: if false;
+      allow create, update: if isUser(uid)
+        && request.resource.data.keys().hasOnly(['totals', 'bySport', 'week', 'month', 'xp', 'level', 'badges',
+             'records', 'currentStreak', 'bestStreak', 'updatedAt'])
+        && validXp(request.resource.data)
+        && request.resource.data.totals is map
+        && request.resource.data.bySport is map
+        && request.resource.data.week is map
+        && request.resource.data.month is map
+        && request.resource.data.badges is map && request.resource.data.badges.size() <= 200
+        && request.resource.data.records is map && request.resource.data.records.size() <= 50
+        && request.resource.data.currentStreak is int && request.resource.data.bestStreak is int
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isUser(uid);
     }
 
     // ---------- activities ----------

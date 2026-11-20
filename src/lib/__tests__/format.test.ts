@@ -37,8 +37,11 @@ describe('format', () => {
     expect(monthKey(new Date(2026, 10, 19))).toBe('2026-11');
   });
 
-  test('levels every 1000 XP', () => {
-    expect(levelForXp(0)).toEqual({ level: 1, intoLevel: 0, perLevel: 1000 });
-    expect(levelForXp(2350)).toEqual({ level: 3, intoLevel: 350, perLevel: 1000 });
+  test('each level takes 250 XP more than the last', () => {
+    expect(levelForXp(0)).toEqual({ level: 1, intoLevel: 0, perLevel: 500, nextAt: 500 });
+    expect(levelForXp(499).level).toBe(1);
+    expect(levelForXp(500)).toEqual({ level: 2, intoLevel: 0, perLevel: 750, nextAt: 1250 });
+    expect(levelForXp(2350)).toEqual({ level: 4, intoLevel: 100, perLevel: 1250, nextAt: 3500 });
+    expect(levelForXp(13500).level).toBe(10);
   });
 });

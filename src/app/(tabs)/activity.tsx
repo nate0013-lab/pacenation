@@ -22,7 +22,7 @@ export default function ActivityTab() {
   const params = useLocalSearchParams<{ sport?: string; queued?: string }>();
   const { profile } = useProfile();
   const session = useTracker();
-  const { activities, loading, error } = useMyActivities(profile.uid);
+  const { activities, loading, error } = useMyActivities();
   const [sport, setSport] = useState<Sport>(isSport(params.sport) ? params.sport : 'run');
   const [pending, setPending] = useState(0);
   const [retrying, setRetrying] = useState(false);

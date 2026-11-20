@@ -119,7 +119,7 @@ describe('profiles and usernames', () => {
     await assertFails(createProfile(as('alice'), 'alice', 'ab'));
   });
 
-  test('owner can edit name, bio and privacy but not xp or level', async () => {
+  test('owner can edit name, bio and privacy, and xp only with a matching level', async () => {
     await createProfile(as('alice'), 'alice', 'alice');
     const db = as('alice');
     await assertSucceeds(
@@ -130,8 +130,14 @@ describe('profiles and usernames', () => {
         updatedAt: serverTimestamp(),
       }),
     );
+    // 100000 XP is level 27, so level 1 does not match.
     await assertFails(updateDoc(doc(db, 'users', 'alice'), { xp: 100000, updatedAt: serverTimestamp() }));
     await assertFails(updateDoc(doc(db, 'users', 'alice'), { level: 50, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, 'users', 'alice'), { xp: 499, level: 2, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, 'users', 'alice'), { xp: -5, level: 1, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db, 'users', 'alice'), { xp: 500, level: 2, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db, 'users', 'alice'), { xp: 2350, level: 4, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, 'users', 'alice'), { followerCount: 99, updatedAt: serverTimestamp() }));
   });
 
   test('others cannot edit my profile', async () => {
@@ -205,9 +211,36 @@ describe('privacy of stats', () => {
     await assertSucceeds(getDoc(doc(as('alice'), 'stats', 'alice')));
   });
 
-  test('nobody can write stats from a device', async () => {
+  const summary = (extra = {}) => ({
+    totals: { distanceM: 5000, movingTimeS: 1500, count: 1 },
+    bySport: { walk: { distanceM: 0, movingTimeS: 0, count: 0 }, run: { distanceM: 5000, movingTimeS: 1500, count: 1 }, ride: { distanceM: 0, movingTimeS: 0, count: 0 } },
+    week: { key: '2026-W47', distanceM: 5000, count: 1 },
+    month: { key: '2026-11', distanceM: 5000, count: 1 },
+    xp: 375,
+    level: 1,
+    badges: { 'first-steps': Date.now(), 'run-5k': Date.now() },
+    records: { 'run-5k': 1500, 'run-longest': 5000 },
+    currentStreak: 1,
+    bestStreak: 1,
+    updatedAt: serverTimestamp(),
+    ...extra,
+  });
+
+  test('the owner keeps their own summary up to date', async () => {
     await seedUser('alice', 'public');
+    await assertSucceeds(setDoc(doc(as('alice'), 'stats', 'alice'), summary()));
+    await assertSucceeds(setDoc(doc(as('alice'), 'stats', 'alice'), summary({ xp: 600, level: 2 })));
+    await assertSucceeds(deleteDoc(doc(as('alice'), 'stats', 'alice')));
+  });
+
+  test('nobody writes someone else\'s summary, or a malformed one', async () => {
+    await seedUser('alice', 'public');
+    await assertFails(setDoc(doc(as('bob'), 'stats', 'alice'), summary()));
     await assertFails(setDoc(doc(as('alice'), 'stats', 'alice'), { totals: { distanceM: 1e9 } }));
+    await assertFails(setDoc(doc(as('alice'), 'stats', 'alice'), summary({ level: 9 })));
+    await assertFails(setDoc(doc(as('alice'), 'stats', 'alice'), summary({ hacked: true })));
+    await assertFails(setDoc(doc(as('alice'), 'stats', 'alice'), summary({ updatedAt: Timestamp.fromMillis(0) })));
+    await assertFails(deleteDoc(doc(as('bob'), 'stats', 'alice')));
   });
 });
 

@@ -20,6 +20,10 @@ import type { TrackPoint } from '@/lib/tracking/geo';
 import { elevationProfile, gpxFileName, kmSplits, toGpx } from '@/lib/tracking/route-tools';
 import { useMemo } from 'react';
 import { SPORT_LABEL, type Activity, type Visibility } from '@/lib/types';
+import { BadgeStrip } from '@/components/badge-strip';
+import { TIER_XP } from '@/lib/progress/badges';
+import { xpForActivity } from '@/lib/progress/xp';
+import { useProgress } from '@/lib/use-stats';
 
 const VIS_LABEL = { public: 'Everyone', followers: 'Followers', private: 'Only me' } as const;
 const VIS_OPTIONS: { value: Visibility; label: string }[] = [
@@ -32,6 +36,7 @@ export default function ActivityDetail() {
   const { id, saved } = useLocalSearchParams<{ id: string; saved?: string }>();
   const router = useRouter();
   const { profile } = useProfile();
+  const progress = useProgress();
   const [activity, setActivity] = useState<Activity | null | undefined>(undefined);
   const [route, setRoute] = useState<TrackPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -136,11 +141,13 @@ export default function ActivityDetail() {
   const a = activity;
   const color = SPORT_COLOR[a.sport];
   const isOwner = a.ownerId === profile.uid;
+  const unlocked = isOwner ? progress.earned.filter((b) => b.activityId === a.id) : [];
+  const xpEarned = xpForActivity(a) + unlocked.reduce((n, b) => n + TIER_XP[b.badge.tier], 0);
   return (
     <Screen header={<ScreenHeader title={SPORT_LABEL[a.sport]} fallback="/" />}>
       {saved ? (
         <Animated.View entering={FadeInDown} style={{ marginBottom: Spacing.md }}>
-          <Banner kind="success" text={`Saved. ${formatDistanceKm(a.distanceM)} km added to your totals.`} />
+          <Banner kind="success" text={`Saved. ${formatDistanceKm(a.distanceM)} km and ${xpEarned} XP added to your totals.`} />
         </Animated.View>
       ) : null}
       <View style={styles.titleRow}>
@@ -191,7 +198,17 @@ export default function ActivityDetail() {
         <Row label="Elapsed time" value={formatDuration(a.elapsedTimeS)} />
         <Row label="Max speed" value={`${formatSpeedKmh(a.maxSpeedMps)} km/h`} />
         <Row label="GPS points" value={String(a.pointCount)} />
+        {isOwner ? <Row label="XP earned" value={`+${xpEarned} XP`} /> : null}
       </Card>
+
+      {unlocked.length ? (
+        <>
+          <SectionHeader title={unlocked.length === 1 ? 'Badge unlocked' : `${unlocked.length} badges unlocked`} />
+          <Card>
+            <BadgeStrip testID="activity-badges" badges={unlocked} />
+          </Card>
+        </>
+      ) : null}
 
       {splits.length ? (
         <>

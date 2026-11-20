@@ -8,8 +8,9 @@ import {
   signInWithEmailAndPassword,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
+import { deleteActivity } from './activities-service';
 import { auth, db } from './firebase';
 
 export async function signUpWithEmail(email: string, password: string) {
@@ -41,8 +42,12 @@ export async function deleteAccount(password: string, usernameLower: string | nu
   if (!user || !user.email) throw new Error('PN:You need to be signed in.');
   await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
   const uid = user.uid;
+  // Activities and their routes go first, while the account can still prove it owns them.
+  const mine = await getDocs(query(collection(db, 'activities'), where('ownerId', '==', uid)));
+  for (const a of mine.docs) await deleteActivity(a.id);
   // One batch, so the username is released in the same write that removes the profile.
   const batch = writeBatch(db);
+  batch.delete(doc(db, 'stats', uid));
   batch.delete(doc(db, 'users', uid, 'private', 'settings'));
   if (usernameLower) batch.delete(doc(db, 'usernames', usernameLower));
   batch.delete(doc(db, 'users', uid));

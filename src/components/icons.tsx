@@ -20,7 +20,16 @@ export type IconName =
   | 'shield'
   | 'trophy'
   | 'bell'
-  | 'map';
+  | 'map'
+  | 'flag'
+  | 'flame'
+  | 'mountain'
+  | 'sun'
+  | 'moon'
+  | 'compass'
+  | 'route'
+  | 'calendar'
+  | 'star';
 
 const paths: Record<IconName, string[]> = {
   home: ['M3 11 L12 3.5 L21 11', 'M5.5 9.5 V20 H10 V14.5 H14 V20 H18.5 V9.5'],
@@ -42,6 +51,15 @@ const paths: Record<IconName, string[]> = {
   trophy: ['M7 4 H17 V9 A5 5 0 0 1 7 9 Z', 'M12 14 V18', 'M8 20.5 H16'],
   bell: ['M6 16.5 V11 A6 6 0 0 1 18 11 V16.5 L19.5 18 H4.5 Z', 'M10 20.5 H14'],
   map: ['M3.5 6 L9 4 L15 6 L20.5 4 V18 L15 20 L9 18 L3.5 20 Z', 'M9 4 V18', 'M15 6 V20'],
+  flag: ['M6 21 V3.5', 'M6 4 H17 L15 8 L17 12 H6'],
+  flame: ['M12 21 C7.5 21 5.5 17.8 5.5 15 C5.5 11 9 9.5 9.5 5.5 C12 7 13 9 13 11 C14 10 14.5 9 14.5 7.5 C17 9.5 18.5 12 18.5 15 C18.5 18 16.5 21 12 21 Z', 'M12 21 C10.3 21 9.5 19.6 9.5 18.3 C9.5 16.5 11 15.5 12 14 C13 15.5 14.5 16.5 14.5 18.3 C14.5 19.6 13.7 21 12 21 Z'],
+  mountain: ['M2.5 19.5 L9 8 L13 14.5 L15.5 11 L21.5 19.5 Z', 'M7.3 11 L9 12.3 L10.6 10.8'],
+  sun: ['M12 2.5 V4.5', 'M12 19.5 V21.5', 'M2.5 12 H4.5', 'M19.5 12 H21.5', 'M5.3 5.3 L6.7 6.7', 'M17.3 17.3 L18.7 18.7', 'M5.3 18.7 L6.7 17.3', 'M17.3 6.7 L18.7 5.3'],
+  moon: ['M19.5 14.5 A8 8 0 1 1 9.5 4.5 A6.5 6.5 0 0 0 19.5 14.5 Z'],
+  compass: ['M15.5 8.5 L13.5 13.5 L8.5 15.5 L10.5 10.5 Z'],
+  route: ['M6 18 C10 18 9 12 12 12 C15 12 14 6 18 6'],
+  calendar: ['M4 6 H20 V20 H4 Z', 'M4 10 H20', 'M8 3.5 V7', 'M16 3.5 V7'],
+  star: ['M12 3.5 L14.6 9 L20.5 9.6 L16 13.6 L17.3 19.5 L12 16.5 L6.7 19.5 L8 13.6 L3.5 9.6 L9.4 9 Z'],
 };
 
 const circles: Partial<Record<IconName, [number, number, number][]>> = {
@@ -53,6 +71,9 @@ const circles: Partial<Record<IconName, [number, number, number][]>> = {
   settings: [[12, 12, 3.5]],
   camera: [[12, 13.2, 3.4]],
   map: [],
+  sun: [[12, 12, 4]],
+  compass: [[12, 12, 9]],
+  route: [[5, 18, 2], [19, 6, 2]],
 };
 
 export function Icon({ name, size = 24, color = '#fff', strokeWidth = 1.9 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {
