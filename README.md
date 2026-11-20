@@ -7,7 +7,7 @@ Expo (React Native + TypeScript) and Firebase.
 
 ## Status
 
-Stage 1 of 7 (foundation and identity) is complete:
+Stages 1 and 2 of 7 are built. Stage 1 (foundation and identity):
 
 - PaceNation brand: P+N logo, Summit Night / Altitude Teal / Sunrise Gold palette, original mountain-trail artwork and icon set
 - Email sign-up, sign-in, forgot password, persistent sessions
@@ -16,7 +16,24 @@ Stage 1 of 7 (foundation and identity) is complete:
 - Home dashboard with weekly, monthly and all-time distance, activity count, level and quick-start buttons
 - Live challenge list (weekly and monthly), username search
 - Edit profile, privacy settings, password reset, sign out, delete account
-- Firestore and Storage security rules for the whole data model, with emulator tests
+- Firestore security rules for the whole data model, with emulator tests
+
+Stage 2 (live tracking):
+
+- Walk, run and ride tracker: start, pause, resume, finish, discard
+- Live route map, distance, moving time, current and average pace, speed, calories
+- GPS accuracy filtering (drops inaccurate fixes, impossible jumps and standing-still jitter)
+- Background tracking on Android and iOS with the screen off; an unfinished activity survives the app closing
+- Activities saved with their full GPS route; offline saves queue on the phone and upload later
+- Activity history, a summary page for every activity, and Home and Profile totals from saved activities
+
+## Firebase plan
+
+PaceNation runs on the free Spark plan: Authentication and Firestore only.
+Profile photos are stored as small JPEG images inside the profile document
+(`src/lib/avatar.ts` is the one place to change to use Cloud Storage later),
+and there are no Cloud Functions. Rules are published by pasting
+`firebase/firestore.rules` into the Firebase console. No composite indexes are needed.
 
 See the build plan doc for the remaining stages.
 
@@ -28,7 +45,7 @@ Requirements: Node 20+, Java 17+ (for the Firebase emulators).
 npm install
 npm --prefix firebase install
 
-# Terminal 1: local Firebase (auth, Firestore, Storage)
+# Terminal 1: local Firebase (auth, Firestore)
 npm run emulators
 
 # Terminal 2: the app, against the emulators
@@ -39,18 +56,17 @@ npx expo start          # press w for web, or scan the QR code with a developmen
 Image picking, GPS and native sign-in need a development build
 (`npx eas-cli@latest build --profile development`) rather than Expo Go.
 
-To use a real Firebase project, fill in `.env` from the Firebase console, then deploy the rules:
+Without `.env` the app talks to the live pacenation-958d2 project.
 
-```bash
-firebase/node_modules/.bin/firebase deploy --only firestore,storage --project <your-project-id>
-```
+Android maps need a Google Maps API key in `app.json` (`android.config.googleMaps.apiKey`). iOS uses Apple Maps and needs no key.
 
 ## Tests
 
 ```bash
 npm run typecheck      # TypeScript
 npm test               # unit tests (Jest)
-npm run test:rules     # Firestore and Storage rules against the emulator
+npm run test:rules     # Firestore rules against the emulator
+# browser walkthroughs: see e2e/README.md
 ```
 
 ## Layout

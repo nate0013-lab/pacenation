@@ -1,0 +1,67 @@
+const { chromium } = require('playwright');
+const OUT = process.argv[2];
+const BASE = process.env.BASE_URL ?? 'http://localhost:8082';
+const errors = [];
+let n = 0;
+(async () => {
+  const b = await chromium.launch();
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: ['geolocation'], geolocation: { latitude: 46.5197, longitude: 6.6323, accuracy: 6 } });
+  const page = await ctx.newPage();
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('pageerror', (e) => errors.push('PAGEERROR ' + e.message));
+  const shot = async (name, full = false) => { await page.waitForTimeout(600); await page.screenshot({ path: `${OUT}/${String(++n).padStart(2, '0')}-${name}.png`, fullPage: full }); };
+  const tid = (id) => page.locator(`[data-testid="${id}"]:visible`);
+  const text = (t) => page.getByText(t).filter({ visible: true }).first();
+  const step = (s) => console.log('STEP', s);
+  const txt = async (id) => (await tid(id).innerText()).trim();
+
+  step('sign up'); await page.goto(BASE + '/'); await tid('welcome-sign-up').click();
+  const email = `run${Date.now()}@example.com`;
+  await tid('sign-up-email').fill(email); await tid('sign-up-password').fill('trail2026'); await tid('sign-up-confirm').fill('trail2026'); await tid('sign-up-submit').click();
+  step('profile with compressed photo'); await tid('create-profile-submit').waitFor({ timeout: 15000 });
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByLabel('Choose profile picture').click()]);
+  await chooser.setFiles(require('path').join(__dirname, 'avatar.jpg'));
+  await tid('profile-display-name').fill('Mara Peaks'); await tid('profile-username').fill('mara' + String(Date.now()).slice(-5)); await tid('profile-weight').fill('60');
+  await text('Available').waitFor({ timeout: 10000 }); await tid('create-profile-submit').click();
+  await tid('home-welcome').waitFor({ timeout: 20000 });
+  const photo = await page.locator('img[alt*="profile picture"], [aria-label*="profile picture"] img').first().getAttribute('src').catch(() => null);
+  console.log('AVATAR src prefix:', String(photo).slice(0, 30), 'length', String(photo).length);
+
+  step('open tracker from Activity tab'); await page.getByRole('tab', { name: /Activity/ }).click(); await tid('activity-start').click();
+  await tid('track-start').waitFor(); await tid('gps-strong').waitFor({ timeout: 10000 }); await shot('tracker-ready');
+  step('start'); await tid('track-start').click(); await tid('track-pause').waitFor();
+  // Run north at about 3.3 m/s (5:00 /km), one fix per second.
+  let lat = 46.5197, lng = 6.6323;
+  const move = async (steps, dLat = 0.00003, dLng = 0.00001) => {
+    for (let i = 0; i < steps; i++) { lat += dLat; lng += dLng; await ctx.setGeolocation({ latitude: lat, longitude: lng, accuracy: 6 }); await page.waitForTimeout(1000); }
+  };
+  await move(25);
+  await shot('tracker-running');
+  const d1 = parseFloat(await txt('track-distance'));
+  console.log('distance after 25 s:', d1, 'pace', await txt('track-pace'), 'cal', await txt('track-calories'));
+  step('GPS jump is ignored'); await ctx.setGeolocation({ latitude: lat + 0.01, longitude: lng, accuracy: 6 }); await page.waitForTimeout(1200);
+  await ctx.setGeolocation({ latitude: lat, longitude: lng, accuracy: 6 }); await page.waitForTimeout(1000);
+  const dJump = parseFloat(await txt('track-distance'));
+  console.log('distance after jump:', dJump);
+  step('inaccurate fix ignored'); await ctx.setGeolocation({ latitude: lat + 0.0005, longitude: lng, accuracy: 80 }); await page.waitForTimeout(1200);
+  console.log('distance after inaccurate fix:', parseFloat(await txt('track-distance')));
+  step('pause'); await tid('track-pause').click(); await tid('track-resume').waitFor();
+  const tPaused = await txt('track-time'); await move(4); const tPaused2 = await txt('track-time');
+  console.log('time while paused', tPaused, '->', tPaused2, 'distance', await txt('track-distance')); await shot('tracker-paused');
+  step('resume'); await tid('track-resume').click(); await move(15, 0.00001, 0.00003);
+  step('finish'); await tid('track-pause').click(); await tid('track-finish').click(); await tid('track-save').waitFor(); await shot('tracker-finish', true);
+  const title = await tid('track-title').inputValue(); console.log('default title', title);
+  step('save'); await tid('track-title').fill('Lakeside tempo'); await tid('track-save').click();
+  await tid('activity-title').waitFor({ timeout: 15000 }); await text(/Saved\./).waitFor(); await shot('activity-detail', true);
+  step('home shows the activity'); await page.goto(BASE + '/'); await tid('home-welcome').waitFor({ timeout: 15000 });
+  console.log('home week distance', await txt('home-week-distance'));
+  await text('Lakeside tempo').waitFor(); await shot('home-with-activity', true);
+  step('history row opens detail'); await page.getByRole('tab', { name: /Activity/ }).click(); await page.waitForTimeout(1500); const rows = page.locator('[data-testid^="activity-row-"]'); const cnt = await rows.count(); for (let i = 0; i < cnt; i++) console.log('row', i, JSON.stringify(await rows.nth(i).boundingBox())); await shot('activity-tab-history'); await rows.filter({ visible: true }).last().click(); await tid('activity-title').waitFor();
+  step('delete'); await tid('activity-delete').click(); await tid('activity-delete').click(); await page.waitForURL(/activity$/, { timeout: 10000 });
+  await text('Nothing tracked yet').waitFor({ timeout: 10000 });
+  step('discard flow'); await tid('activity-start').click(); await tid('track-start').click(); await move(3); await tid('track-pause').click(); await tid('track-finish').click();
+  await tid('track-discard').click(); await tid('track-discard').click(); await text('Nothing tracked yet').waitFor({ timeout: 10000 });
+  console.log('ALL STEPS PASSED');
+  console.log('CONSOLE ERRORS:', JSON.stringify(errors, null, 1));
+  await b.close();
+})().catch(async (e) => { console.log('FAILED', e.message.split('\n').slice(0, 6).join('\n')); console.log('CONSOLE ERRORS:', JSON.stringify(errors.slice(0, 10), null, 1)); process.exit(1); });

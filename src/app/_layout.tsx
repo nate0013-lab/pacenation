@@ -8,8 +8,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LogoMark } from '@/components/logo';
 import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+// Registers the background location task at start-up and restores an unfinished activity.
+import { restoreSession } from '@/lib/tracking/store';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+restoreSession();
 
 /** Sends people to the right area for their sign-in state. */
 function AuthGate() {
@@ -38,6 +41,7 @@ function AuthGate() {
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
         <Stack.Screen name="create-profile" options={{ animation: 'fade' }} />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="(main)" />
       </Stack>
       {status === 'loading' ? (
         <View style={styles.loading} testID="app-loading">
