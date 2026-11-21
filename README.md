@@ -7,7 +7,7 @@ Expo (React Native + TypeScript) and Firebase.
 
 ## Status
 
-Stages 1 to 5 of 7 are built. Stage 1 (foundation and identity):
+Stages 1 to 6 of 7 are built. Stage 1 (foundation and identity):
 
 - PaceNation brand: P+N logo, Summit Night / Altitude Teal / Sunrise Gold palette, original mountain-trail artwork and icon set
 - Email sign-up, sign-in, forgot password, persistent sessions
@@ -52,6 +52,15 @@ Stage 5 (community):
 - Profiles of other people show stats, badges, records and activities only when their privacy settings allow
 - This week's ranking among the people you follow, and a Discover list of new members
 - "Only me" activities are left out of shared totals and records
+
+Stage 6 (challenges and leaderboards):
+
+- Ten built-in challenges that renew every Monday and on the 1st: run, walk and ride distances, a five-activity week, a monthly climb, and two community challenges with one shared total
+- Join and leave; activities already saved in the period count straight away; progress, ranking and completion date per challenge
+- Challenge badges (complete 1, 5 and 20 challenges)
+- Leaderboards for this week, this month and all time, for all sports or walk, run or ride, with your position
+- People who turn off "Show me on leaderboards" are removed from every board; "Only me" activities never count
+- No server: each phone writes its own challenge entry and leaderboard places, checked by the security rules
 
 ## Firebase plan
 

@@ -17,11 +17,13 @@ import { useSocial } from '@/lib/use-social';
 import { ActivityRow } from '@/components/activity-row';
 import { BadgeStrip } from '@/components/badge-strip';
 import { DistanceBars } from '@/components/week-bars';
+import { ChallengeCard } from '@/components/challenge-card';
 
 export default function Home() {
   const router = useRouter();
   const { profile } = useProfile();
-  const { stats, activities, progress } = useMyActivities();
+  const { stats, activities, progress, joined } = useMyActivities();
+  const activeChallenges = joined.filter((j) => j.active);
   const { following, requests } = useSocial();
   const nextBadges = progress.badges.filter((b) => b.earnedAt === null).sort((a, b) => b.ratio - a.ratio).slice(0, 4);
   const firstName = profile.displayName.split(' ')[0];
@@ -97,10 +99,22 @@ export default function Home() {
         </Card>
       )}
 
-      <SectionHeader title="Current challenges" />
-      <EmptyState icon="challenges" title="You have not joined a challenge" body="Weekly and monthly challenges keep you moving and earn badges.">
-        <Button title="Browse challenges" variant="secondary" onPress={() => router.navigate('/challenges')} style={{ marginTop: Spacing.sm }} />
-      </EmptyState>
+      <SectionHeader
+        title="Current challenges"
+        action={<Button testID="home-leaderboards" title="Leaderboards" variant="ghost" onPress={() => router.push('/leaderboards')} style={{ minHeight: 32, paddingHorizontal: 0 }} />}
+      />
+      {activeChallenges.length === 0 ? (
+        <EmptyState icon="challenges" title="You have not joined a challenge" body="Weekly and monthly challenges keep you moving and earn badges.">
+          <Button title="Browse challenges" variant="secondary" onPress={() => router.navigate('/challenges')} style={{ marginTop: Spacing.sm }} />
+        </EmptyState>
+      ) : (
+        <View style={{ gap: Spacing.md }}>
+          {activeChallenges.slice(0, 3).map((j) => (
+            <ChallengeCard key={j.challenge.id} c={j.challenge} mine={j} />
+          ))}
+          {activeChallenges.length > 3 ? <Button title={`All ${activeChallenges.length} challenges`} variant="ghost" onPress={() => router.navigate('/challenges')} /> : null}
+        </View>
+      )}
 
       <SectionHeader
         title="Achievements"

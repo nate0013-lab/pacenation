@@ -11,7 +11,7 @@ import { XP_PER_ACTIVITY, XP_PER_KM } from '@/lib/progress/xp';
 import { useProgress } from '@/lib/use-stats';
 
 type Filter = 'all' | 'earned' | 'locked';
-const CATEGORIES = ['Milestones', 'Distance', 'Consistency', 'Explorer'] as const;
+const CATEGORIES = ['Milestones', 'Distance', 'Consistency', 'Challenges', 'Explorer'] as const;
 
 function progressText(b: BadgeState): string {
   const unit = b.badge.unit;

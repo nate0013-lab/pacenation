@@ -166,6 +166,7 @@ export default function CommunityTab() {
                     </Pressable>
                   ))}
                 </Card>
+                <Button testID="community-leaderboards" title="See global leaderboards" variant="ghost" icon="trophy" onPress={() => router.push('/leaderboards')} style={{ marginTop: Spacing.sm }} />
                 {ranking.length <= 1 ? (
                   <Text style={[Type.small, { color: Colors.textSecondary, marginTop: Spacing.md, textAlign: 'center' }]}>Follow people to compare your week with theirs.</Text>
                 ) : null}

@@ -13,7 +13,7 @@ export const TIER_COLOR: Record<BadgeTier, { light: string; dark: string; label:
 
 const ICON: Record<BadgeIcon, IconName> = {
   flag: 'flag', route: 'route', run: 'run', walk: 'walk', ride: 'ride', flame: 'flame',
-  calendar: 'calendar', mountain: 'mountain', sun: 'sun', moon: 'moon', compass: 'compass',
+  calendar: 'calendar', mountain: 'mountain', sun: 'sun', moon: 'moon', compass: 'compass', trophy: 'trophy',
 };
 
 // A rounded hexagon on a 100x100 grid, with a smaller one inside.
