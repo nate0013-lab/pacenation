@@ -1,5 +1,9 @@
-import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { connectionCounts } from '@/lib/social-service';
+import { useSocial } from '@/lib/use-social';
 
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icons';
@@ -22,6 +26,14 @@ export default function ProfileTab() {
   const router = useRouter();
   const { profile } = useProfile();
   const { stats, progress } = useMyActivities();
+  const { following, requests } = useSocial();
+  const [counts, setCounts] = useState<{ followers: number; following: number } | null>(null);
+  const followingKey = following.join(',');
+  useFocusEffect(
+    useCallback(() => {
+      connectionCounts(profile.uid).then(setCounts).catch(() => undefined);
+    }, [profile.uid, followingKey, requests.length]),
+  );
 
   return (
     <Screen padded={false}>
@@ -39,19 +51,29 @@ export default function ProfileTab() {
         {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
 
         <View style={styles.follows}>
-          <View style={styles.followItem}>
-            <Text style={styles.followNum}>{profile.followerCount}</Text>
+          <Pressable style={styles.followItem} testID="profile-followers" accessibilityRole="button" onPress={() => router.push({ pathname: '/connections', params: { uid: profile.uid, kind: 'followers' } })}>
+            <Text style={styles.followNum}>{counts ? counts.followers : '–'}</Text>
             <Text style={styles.followLabel}>Followers</Text>
-          </View>
-          <View style={styles.followItem}>
-            <Text style={styles.followNum}>{profile.followingCount}</Text>
+          </Pressable>
+          <Pressable style={styles.followItem} testID="profile-following" accessibilityRole="button" onPress={() => router.push({ pathname: '/connections', params: { uid: profile.uid, kind: 'following' } })}>
+            <Text style={styles.followNum}>{counts ? counts.following : '–'}</Text>
             <Text style={styles.followLabel}>Following</Text>
-          </View>
+          </Pressable>
           <View style={styles.followItem}>
             <Text style={styles.followNum}>{stats.totals.count}</Text>
             <Text style={styles.followLabel}>Activities</Text>
           </View>
         </View>
+
+        {requests.length > 0 ? (
+          <Pressable testID="profile-requests" accessibilityRole="button" onPress={() => router.push('/requests')} style={styles.requests}>
+            <Icon name="user-plus" size={20} color={Colors.gold} />
+            <Text style={[Type.bodyStrong, { color: Colors.text, flex: 1 }]}>
+              {requests.length} follow {requests.length === 1 ? 'request' : 'requests'}
+            </Text>
+            <Icon name="chevron-right" size={18} color={Colors.textMuted} />
+          </Pressable>
+        ) : null}
 
         <Card style={{ marginTop: Spacing.lg }}>
           <LevelBar xp={progress.xp} />
@@ -148,5 +170,6 @@ const styles = StyleSheet.create({
   followLabel: { ...Type.small, color: Colors.textSecondary },
   grid: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg },
   sportRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.lg },
+  requests: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.gold, padding: Spacing.lg, marginTop: Spacing.md },
   divider: { borderTopWidth: 1, borderTopColor: Colors.border },
 });

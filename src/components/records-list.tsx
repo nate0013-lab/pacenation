@@ -32,12 +32,14 @@ export function RecordsList({ records }: { records: PersonalRecord[] }) {
           </View>
           {g.items.map((r) => {
             const v = valueText(r);
+            if (!r.activityTitle) v.sub = r.kind === 'time' ? v.sub : '';
             return (
               <Pressable
                 key={r.key}
                 testID={`record-${r.key}`}
                 accessibilityRole="button"
                 accessibilityLabel={`${r.label} record ${v.main}`}
+                disabled={!r.activityId}
                 onPress={() => router.push(`/activity/${r.activityId}`)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: Colors.surfaceRaised }]}>
                 <Text style={[Type.body, { color: Colors.text, flex: 1 }]}>{r.label}</Text>

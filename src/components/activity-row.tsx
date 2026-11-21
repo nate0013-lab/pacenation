@@ -19,21 +19,25 @@ export function RouteThumb({
   polyline,
   color,
   size = 64,
+  width,
 }: {
   polyline: string;
   color: string;
+  /** Height, and width unless `width` is given. */
   size?: number;
+  width?: number;
 }) {
+  const w = width ?? size;
   const pts = decodePolyline(polyline);
   const b = boundsOf(pts);
   if (!b || pts.length < 2) {
-    return <View style={[styles.thumb, { width: size, height: size }]} />;
+    return <View style={[styles.thumb, { width: w, height: size }]} />;
   }
   const midLat = ((b.minLat + b.maxLat) / 2) * (Math.PI / 180);
   const spanX = Math.max((b.maxLng - b.minLng) * Math.cos(midLat), 1e-5);
   const spanY = Math.max(b.maxLat - b.minLat, 1e-5);
-  const scale = (size - 14) / Math.max(spanX, spanY);
-  const ox = (size - spanX * scale) / 2;
+  const scale = Math.min((w - 14) / spanX, (size - 14) / spanY);
+  const ox = (w - spanX * scale) / 2;
   const oy = (size - spanY * scale) / 2;
   const d = pts
     .map(
@@ -42,8 +46,8 @@ export function RouteThumb({
     )
     .join(" ");
   return (
-    <View style={[styles.thumb, { width: size, height: size }]}>
-      <Svg width={size} height={size}>
+    <View style={[styles.thumb, { width: w, height: size }]}>
+      <Svg width={w} height={size}>
         <Polyline
           points={d}
           fill="none"

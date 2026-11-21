@@ -24,6 +24,11 @@ import { BadgeStrip } from '@/components/badge-strip';
 import { TIER_XP } from '@/lib/progress/badges';
 import { xpForActivity } from '@/lib/progress/xp';
 import { useProgress } from '@/lib/use-stats';
+import { ActivitySocial } from '@/components/activity-social';
+import { Avatar } from '@/components/avatar';
+import { getUserCard } from '@/lib/social-service';
+import { Pressable } from 'react-native';
+import type { UserProfile } from '@/lib/types';
 
 const VIS_LABEL = { public: 'Everyone', followers: 'Followers', private: 'Only me' } as const;
 const VIS_OPTIONS: { value: Visibility; label: string }[] = [
@@ -47,6 +52,7 @@ export default function ActivityDetail() {
   const [draftTitle, setDraftTitle] = useState('');
   const [draftVis, setDraftVis] = useState<Visibility>('followers');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [owner, setOwner] = useState<UserProfile | null>(null);
   const splits = useMemo(() => kmSplits(route), [route]);
   const profile3 = useMemo(() => elevationProfile(route), [route]);
 
@@ -57,6 +63,7 @@ export default function ActivityDetail() {
         if (cancelled) return;
         setActivity(a);
         setRoute(r);
+        if (a && a.ownerId !== profile.uid) getUserCard(a.ownerId).then((o) => !cancelled && setOwner(o)).catch(() => undefined);
       })
       .catch(() => !cancelled && (setActivity(null), setError('This activity is private or no longer exists.')));
     return () => {
@@ -150,6 +157,13 @@ export default function ActivityDetail() {
           <Banner kind="success" text={`Saved. ${formatDistanceKm(a.distanceM)} km and ${xpEarned} XP added to your totals.`} />
         </Animated.View>
       ) : null}
+      {!isOwner && owner ? (
+        <Pressable testID="activity-owner" accessibilityRole="button" accessibilityLabel={`Open ${owner.displayName}'s profile`} onPress={() => router.push({ pathname: '/user/[uid]', params: { uid: owner.uid } })} style={styles.ownerRow}>
+          <Avatar uri={owner.photoURL} name={owner.displayName} size={36} />
+          <Text style={[Type.bodyStrong, { color: Colors.text, flex: 1 }]}>{owner.displayName}</Text>
+          <Icon name="chevron-right" size={18} color={Colors.textMuted} />
+        </Pressable>
+      ) : null}
       <View style={styles.titleRow}>
         <Icon name={a.sport} size={26} color={color} />
         <View style={{ flex: 1 }}>
@@ -229,6 +243,8 @@ export default function ActivityDetail() {
       </Card>
 
       {error ? <Banner kind="error" text={error} /> : null}
+      <ActivitySocial activityId={a.id} ownerId={a.ownerId} me={profile.uid} />
+
       {isOwner ? (
         editing ? (
           <Card style={{ gap: Spacing.md, marginTop: Spacing.xl }}>
@@ -266,6 +282,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.sm },
   legend: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.sm },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -45,6 +45,23 @@ export async function deleteAccount(password: string, usernameLower: string | nu
   // Activities and their routes go first, while the account can still prove it owns them.
   const mine = await getDocs(query(collection(db, 'activities'), where('ownerId', '==', uid)));
   for (const a of mine.docs) await deleteActivity(a.id);
+  // Follow edges and requests, so nobody keeps a link to a deleted account.
+  const [following, followers, requests] = await Promise.all([
+    getDocs(collection(db, 'users', uid, 'following')),
+    getDocs(collection(db, 'users', uid, 'followers')),
+    getDocs(collection(db, 'users', uid, 'followRequests')),
+  ]);
+  const edges = writeBatch(db);
+  following.docs.forEach((d) => {
+    edges.delete(d.ref);
+    edges.delete(doc(db, 'users', d.id, 'followers', uid));
+  });
+  followers.docs.forEach((d) => {
+    edges.delete(d.ref);
+    edges.delete(doc(db, 'users', d.id, 'following', uid));
+  });
+  requests.docs.forEach((d) => edges.delete(d.ref));
+  if (following.size + followers.size + requests.size > 0) await edges.commit();
   // One batch, so the username is released in the same write that removes the profile.
   const batch = writeBatch(db);
   batch.delete(doc(db, 'stats', uid));

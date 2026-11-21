@@ -111,3 +111,4 @@ describe('progress', () => {
     expect(p.currentStreak).toBe(2);
   });
 });
+

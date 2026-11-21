@@ -6,7 +6,7 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import type { BadgeState } from '@/lib/progress/badges';
 
 /** A row of medals; tapping one opens the full badge list. */
-export function BadgeStrip({ badges, testID }: { badges: BadgeState[]; testID?: string }) {
+export function BadgeStrip({ badges, testID, interactive = true }: { badges: BadgeState[]; testID?: string; interactive?: boolean }) {
   const router = useRouter();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} testID={testID}>
@@ -16,6 +16,7 @@ export function BadgeStrip({ badges, testID }: { badges: BadgeState[]; testID?: 
           testID={`badge-chip-${b.badge.id}`}
           accessibilityRole="button"
           accessibilityLabel={`${b.badge.name} badge${b.earnedAt ? '' : ', locked'}`}
+          disabled={!interactive}
           onPress={() => router.push({ pathname: '/badges', params: { focus: b.badge.id } })}
           style={styles.item}>
           <BadgeMedal id={`strip-${b.badge.id}`} tier={b.badge.tier} icon={b.badge.icon} size={64} locked={b.earnedAt === null} />

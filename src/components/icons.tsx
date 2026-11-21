@@ -29,7 +29,13 @@ export type IconName =
   | 'compass'
   | 'route'
   | 'calendar'
-  | 'star';
+  | 'star'
+  | 'heart'
+  | 'comment'
+  | 'search'
+  | 'user-plus'
+  | 'check'
+  | 'close';
 
 const paths: Record<IconName, string[]> = {
   home: ['M3 11 L12 3.5 L21 11', 'M5.5 9.5 V20 H10 V14.5 H14 V20 H18.5 V9.5'],
@@ -59,6 +65,12 @@ const paths: Record<IconName, string[]> = {
   compass: ['M15.5 8.5 L13.5 13.5 L8.5 15.5 L10.5 10.5 Z'],
   route: ['M6 18 C10 18 9 12 12 12 C15 12 14 6 18 6'],
   calendar: ['M4 6 H20 V20 H4 Z', 'M4 10 H20', 'M8 3.5 V7', 'M16 3.5 V7'],
+  heart: ['M12 20 C6 15.5 3 12.5 3 8.8 C3 6.2 5 4.3 7.5 4.3 C9.4 4.3 11 5.4 12 7 C13 5.4 14.6 4.3 16.5 4.3 C19 4.3 21 6.2 21 8.8 C21 12.5 18 15.5 12 20 Z'],
+  comment: ['M4 5 H20 V16 H11 L6.5 20 V16 H4 Z'],
+  search: ['M15.5 15.5 L20.5 20.5'],
+  'user-plus': ['M2.5 20 A6.5 6.5 0 0 1 15.5 20', 'M19 8 V14', 'M16 11 H22'],
+  check: ['M5 12.5 L10 17.5 L19 7'],
+  close: ['M6 6 L18 18', 'M18 6 L6 18'],
   star: ['M12 3.5 L14.6 9 L20.5 9.6 L16 13.6 L17.3 19.5 L12 16.5 L6.7 19.5 L8 13.6 L3.5 9.6 L9.4 9 Z'],
 };
 
@@ -74,6 +86,8 @@ const circles: Partial<Record<IconName, [number, number, number][]>> = {
   sun: [[12, 12, 4]],
   compass: [[12, 12, 9]],
   route: [[5, 18, 2], [19, 6, 2]],
+  search: [[10.5, 10.5, 6]],
+  'user-plus': [[9, 9, 3.6]],
 };
 
 export function Icon({ name, size = 24, color = '#fff', strokeWidth = 1.9 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {

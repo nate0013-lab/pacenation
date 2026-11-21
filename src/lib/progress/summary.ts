@@ -208,3 +208,29 @@ export function computeProgress(list: ProgressActivity[], now: Date = new Date()
 export function badgesUnlockedBy(list: ProgressActivity[], activityId: string): BadgeState[] {
   return computeProgress(list).earned.filter((b) => b.activityId === activityId);
 }
+
+/** Rebuilds records from someone's public summary (no activity links). */
+export function recordsFromSummary(records: Record<string, number> | undefined): PersonalRecord[] {
+  if (!records) return [];
+  const order = ['run-1k', 'run-5k', 'run-10k', 'run-half', 'run-marathon', 'run-longest', 'walk-1k', 'walk-5k', 'walk-10k', 'walk-longest', 'ride-10k', 'ride-20k', 'ride-40k', 'ride-100k', 'ride-longest', 'climb'];
+  const out: PersonalRecord[] = [];
+  for (const [key, value] of Object.entries(records)) {
+    if (!order.includes(key) || typeof value !== 'number') continue;
+    const base = { key, value, activityId: '', activityTitle: '', at: 0 };
+    if (key === 'climb') out.push({ ...base, sport: 'ride', label: 'Biggest climb', kind: 'climb' });
+    else {
+      const [sport, what] = key.split('-') as [Sport, string];
+      if (what === 'longest') out.push({ ...base, sport, label: `Longest ${sport}`, kind: 'distance' });
+      else out.push({ ...base, sport, label: EFFORT_LABEL[what as EffortKey], kind: 'time' });
+    }
+  }
+  return out.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+}
+
+/** Badge states from someone's public summary. */
+export function badgesFromSummary(badges: Record<string, number> | undefined): BadgeState[] {
+  if (!badges) return [];
+  return BADGES.filter((b) => typeof badges[b.id] === 'number')
+    .map((b) => ({ badge: b, earnedAt: badges[b.id], activityId: null, current: 1, target: 1, ratio: 1 }))
+    .sort((a, b) => b.earnedAt! - a.earnedAt!);
+}

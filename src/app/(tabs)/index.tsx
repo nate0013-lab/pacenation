@@ -13,6 +13,7 @@ import { useProfile } from '@/lib/auth-context';
 import { formatDistanceKm, greeting } from '@/lib/format';
 import { SPORTS } from '@/lib/types';
 import { useMyActivities } from '@/lib/use-stats';
+import { useSocial } from '@/lib/use-social';
 import { ActivityRow } from '@/components/activity-row';
 import { BadgeStrip } from '@/components/badge-strip';
 import { DistanceBars } from '@/components/week-bars';
@@ -21,6 +22,7 @@ export default function Home() {
   const router = useRouter();
   const { profile } = useProfile();
   const { stats, activities, progress } = useMyActivities();
+  const { following, requests } = useSocial();
   const nextBadges = progress.badges.filter((b) => b.earnedAt === null).sort((a, b) => b.ratio - a.ratio).slice(0, 4);
   const firstName = profile.displayName.split(' ')[0];
 
@@ -121,9 +123,18 @@ export default function Home() {
       </Card>
 
       <SectionHeader title="Community" />
-      <EmptyState icon="community" title="Your feed is quiet" body="Follow other athletes to see their activities here.">
-        <Button title="Find people" variant="secondary" onPress={() => router.navigate('/community')} style={{ marginTop: Spacing.sm }} />
-      </EmptyState>
+      {following.length === 0 ? (
+        <EmptyState icon="community" title="Your feed is quiet" body="Follow other athletes to see their activities here.">
+          <Button title="Find people" variant="secondary" onPress={() => router.navigate('/community')} style={{ marginTop: Spacing.sm }} />
+        </EmptyState>
+      ) : (
+        <Card style={{ gap: Spacing.md }}>
+          <Text style={[Type.body, { color: Colors.text }]}>
+            You follow {following.length} {following.length === 1 ? 'person' : 'people'}.{requests.length ? ` ${requests.length} waiting for your approval.` : ''}
+          </Text>
+          <Button testID="home-open-feed" title="Open your feed" variant="secondary" icon="community" onPress={() => router.navigate('/community')} />
+        </Card>
+      )}
     </Screen>
   );
 }

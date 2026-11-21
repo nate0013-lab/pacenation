@@ -101,7 +101,7 @@ export function MyActivitiesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!uid || !profile || state.loading || state.error) return;
-    const summary = summaryDoc(state.progress);
+    const summary = summaryDoc(state.progress, computeProgress(state.activities.filter((a) => a.visibility !== 'private')));
     const key = JSON.stringify(summary);
     if (key === lastSynced.current && profile.xp === summary.xp && profile.level === summary.level) return;
     lastSynced.current = key;
