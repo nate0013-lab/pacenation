@@ -42,15 +42,13 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      - name: Link the Expo project
-        run: eas init --non-interactive --force
       - name: Build the Android app on Expo
         id: build
         run: |
           eas build --platform android --profile "${{ inputs.profile || 'preview' }}" --non-interactive --wait --json > build.json
           cat build.json
           url=$(node -e "const b=require('./build.json')[0]; console.log(b.artifacts && (b.artifacts.applicationArchiveUrl || b.artifacts.buildUrl) || '')")
-          page=$(node -e "const b=require('./build.json')[0]; console.log('https://expo.dev/accounts/' + b.project.ownerAccount.name + '/projects/' + b.project.slug + '/builds/' + b.id)")
+          page=$(node -e "const b=require('./build.json')[0]; console.log('https://expo.dev/accounts/nate0013-lab/projects/pacenation/builds/' + b.id)")
           echo "APK_URL=$url" >> "$GITHUB_OUTPUT"
           {
             echo "## PaceNation Android test build"
@@ -58,5 +56,3 @@ jobs:
             echo "- Install file (APK): $url"
             echo "- Build page (shows a QR code to install on a phone): $page"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Show the project ID to commit
-        run: node -e "console.log('EAS projectId:', require('./app.json').expo.extra.eas.projectId)"
