@@ -10,7 +10,6 @@ cloud with EAS (Expo Application Services), so no Mac is needed for iPhone build
 | Expo account | expo.dev/signup | Free (30 builds a month) |
 | Google Play Console | play.google.com/console | US$25 once |
 | Apple Developer Program | developer.apple.com/programs | US$99 a year |
-| Google Maps Android key | Google Cloud console > APIs & Services > Credentials (enable "Maps SDK for Android") | Free tier |
 
 ```bash
 npm i -g eas-cli
@@ -20,11 +19,9 @@ eas init                 # links the project to your Expo account and fills extr
 
 ## 2. Secrets for builds
 
-Store these as EAS environment variables (`eas env:create`), visible to the
+Maps need no key (free OpenFreeMap tiles) and the Google web client ID is built in. Store these as EAS environment variables (`eas env:create`), visible to the
 `preview` and `production` environments:
 
-- `GOOGLE_MAPS_ANDROID_KEY`: the Android maps key (restrict it to package `app.pacenation`)
-- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`: Firebase console > Authentication > Google > Web client ID
 - `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`: Google Cloud OAuth client of type Android, package `app.pacenation`, with the SHA-1 from `eas credentials`
 - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`: Google Cloud OAuth client of type iOS, bundle ID `app.pacenation`
 - `EXPO_PUBLIC_APPLE_SIGN_IN=1`: after enabling Apple in Firebase Authentication (needs the Apple Developer account)
@@ -38,6 +35,14 @@ The Google and Apple buttons stay hidden in any build that is missing its value.
 - Firestore > Rules: paste `firebase/firestore.rules` and publish
 
 ## 4. Builds
+
+**From GitHub (no computer setup):** add an `EXPO_TOKEN` repository secret
+(expo.dev > Account settings > Access tokens > Create; then GitHub repo >
+Settings > Secrets and variables > Actions > New repository secret), and run
+the "Phone test build" workflow from the Actions tab. When it finishes, its
+summary links the APK and the Expo build page with an install QR code.
+
+**From a computer:**
 
 ```bash
 eas build --profile development --platform android   # test build with the dev menu, installs as an APK
