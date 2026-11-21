@@ -109,13 +109,13 @@ export function PersonRow({ user, me, right, testID }: { user: UserProfile; me: 
 }
 
 /** Like button. The parent loads the reactions and gets every change back. */
-export function LikeButton({ activityId, me, value, onChange }: { activityId: string; me: string; value: Reactions | null; onChange: (r: Reactions) => void }) {
+export function LikeButton({ activityId, me, value, onChange, ownerId }: { activityId: string; me: string; value: Reactions | null; onChange: (r: Reactions) => void; ownerId?: string }) {
   async function toggle() {
     if (!value) return;
     const next = { ...value, likedByMe: !value.likedByMe, likes: Math.max(0, value.likes + (value.likedByMe ? -1 : 1)) };
     onChange(next);
     try {
-      await setLike(activityId, me, next.likedByMe);
+      await setLike(activityId, me, next.likedByMe, ownerId);
     } catch {
       onChange(value);
     }
@@ -198,7 +198,7 @@ export function FeedCard({ item, me }: { item: FeedItem; me: string }) {
         {a.polyline ? <RouteBanner polyline={a.polyline} color={color} /> : null}
       </Pressable>
       <View style={styles.reactions}>
-        <LikeButton activityId={a.id} me={me} value={r} onChange={setR} />
+        <LikeButton activityId={a.id} me={me} value={r} onChange={setR} ownerId={a.ownerId} />
         <Pressable style={styles.reaction} onPress={open} accessibilityRole="button" accessibilityLabel="Comments" testID={`comments-${a.id}`}>
           <Icon name="comment" size={20} color={Colors.textSecondary} />
           <Text style={[Type.small, { color: Colors.textSecondary }]}>{r ? r.comments : '–'}</Text>

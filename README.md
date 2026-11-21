@@ -7,7 +7,7 @@ Expo (React Native + TypeScript) and Firebase.
 
 ## Status
 
-Stages 1 to 6 of 7 are built. Stage 1 (foundation and identity):
+All seven stages are built. Stage 1 (foundation and identity):
 
 - PaceNation brand: P+N logo, Summit Night / Altitude Teal / Sunrise Gold palette, original mountain-trail artwork and icon set
 - Email sign-up, sign-in, forgot password, persistent sessions
@@ -62,6 +62,15 @@ Stage 6 (challenges and leaderboards):
 - People who turn off "Show me on leaderboards" are removed from every board; "Only me" activities never count
 - No server: each phone writes its own challenge entry and leaderboard places, checked by the security rules
 
+Stage 7 (events, notifications, launch):
+
+- Group events: host a walk, run or ride with a time, meeting point, optional map pin, distance and number of spaces; edit or cancel it
+- Join and leave events, see who is going, open the meeting point in maps; Upcoming events on Home and an Events list with a Going filter
+- In-app notifications for new followers, follow requests, cheers, comments, event joins, changes and cancellations, with a bell and unread count on Home
+- Notification settings to hide each kind; the security rules check every notification matches something that really happened
+- Google sign-in (web and phones) and Apple sign-in (iPhone), switched on by configuration so the buttons only appear once they work
+- Phone builds with EAS (`eas.json`): development, preview and production profiles; see `docs/LAUNCH.md`
+
 ## Firebase plan
 
 PaceNation runs on the free Spark plan: Authentication and Firestore only.
@@ -70,7 +79,7 @@ Profile photos are stored as small JPEG images inside the profile document
 and there are no Cloud Functions. Rules are published by pasting
 `firebase/firestore.rules` into the Firebase console. No composite indexes are needed.
 
-See the build plan doc for the remaining stages.
+Store builds and release steps: `docs/LAUNCH.md`.
 
 ## Run it
 
@@ -93,7 +102,9 @@ Image picking, GPS and native sign-in need a development build
 
 Without `.env` the app talks to the live pacenation-958d2 project.
 
-Android maps need a Google Maps API key in `app.json` (`android.config.googleMaps.apiKey`). iOS uses Apple Maps and needs no key.
+Android maps need a Google Maps API key, read at build time from `GOOGLE_MAPS_ANDROID_KEY` (see `app.config.js`). iOS uses Apple Maps and needs no key.
+
+Google and Apple sign-in are configured with the `EXPO_PUBLIC_GOOGLE_*` and `EXPO_PUBLIC_APPLE_SIGN_IN` values in `.env.example`.
 
 ## Tests
 

@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -18,6 +19,10 @@ import { ActivityRow } from '@/components/activity-row';
 import { BadgeStrip } from '@/components/badge-strip';
 import { DistanceBars } from '@/components/week-bars';
 import { ChallengeCard } from '@/components/challenge-card';
+import { EventCard } from '@/components/event-card';
+import { Icon } from '@/components/icons';
+import { useNotifications } from '@/lib/use-notifications';
+import { watchMyEventIds, watchUpcoming, type PaceEvent } from '@/lib/events-service';
 
 export default function Home() {
   const router = useRouter();
@@ -27,6 +32,11 @@ export default function Home() {
   const { following, requests } = useSocial();
   const nextBadges = progress.badges.filter((b) => b.earnedAt === null).sort((a, b) => b.ratio - a.ratio).slice(0, 4);
   const firstName = profile.displayName.split(' ')[0];
+  const { unread } = useNotifications();
+  const [upcoming, setUpcoming] = useState<PaceEvent[]>([]);
+  const [goingIds, setGoingIds] = useState<string[]>([]);
+  useEffect(() => watchUpcoming((list) => setUpcoming(list.slice(0, 3)), 10), []);
+  useEffect(() => watchMyEventIds(profile.uid, setGoingIds), [profile.uid]);
 
   return (
     <Screen>
@@ -38,6 +48,19 @@ export default function Home() {
             {firstName}
           </Text>
         </View>
+        <Pressable
+          testID="home-bell"
+          accessibilityRole="button"
+          accessibilityLabel={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+          onPress={() => router.push('/notifications')}
+          style={styles.bell}>
+          <Icon name="bell" size={24} color={Colors.text} />
+          {unread > 0 ? (
+            <View style={styles.bellDot} testID="home-bell-unread">
+              <Text style={styles.bellCount}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          ) : null}
+        </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Open your profile" onPress={() => router.navigate('/profile')}>
           <Avatar uri={profile.photoURL} name={profile.displayName} size={44} />
         </Pressable>
@@ -117,6 +140,22 @@ export default function Home() {
       )}
 
       <SectionHeader
+        title="Upcoming events"
+        action={<Button testID="home-events" title="All events" variant="ghost" onPress={() => router.push('/events')} style={{ minHeight: 32, paddingHorizontal: 0 }} />}
+      />
+      {upcoming.length === 0 ? (
+        <EmptyState icon="calendar" title="No events planned" body="Host a group walk, run or ride and invite the community to join you.">
+          <Button testID="home-host-event" title="Host an event" variant="secondary" onPress={() => router.push('/events/new')} style={{ marginTop: Spacing.sm }} />
+        </EmptyState>
+      ) : (
+        <View style={{ gap: Spacing.md }}>
+          {upcoming.map((e) => (
+            <EventCard key={e.id} ev={e} going={goingIds.includes(e.id)} />
+          ))}
+        </View>
+      )}
+
+      <SectionHeader
         title="Achievements"
         action={<Button testID="home-badges" title="All badges" variant="ghost" onPress={() => router.push('/badges')} style={{ minHeight: 32, paddingHorizontal: 0 }} />}
       />
@@ -166,5 +205,8 @@ const styles = StyleSheet.create({
   heroSub: { ...Type.small, color: Colors.textSecondary },
   grid: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg },
   sports: { flexDirection: 'row', gap: Spacing.md },
+  bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  bellDot: { position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  bellCount: { fontSize: 10, fontWeight: '800', color: Colors.bg },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: Spacing.md },
 });

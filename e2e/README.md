@@ -13,6 +13,7 @@ node e2e/tracking.e2e.js e2e/out                    # GPS tracking, save, replay
 node e2e/progress.e2e.js e2e/out                    # seeded history: dashboard, XP, levels, records, badges, stats sync
 node e2e/community.e2e.js e2e/out                   # two people: follow, requests, feed privacy, cheers, comments, ranking
 node e2e/challenges.e2e.js e2e/out                  # two people: challenges, community total, challenge badge, leaderboards, opting out
+node e2e/events.e2e.js e2e/out                      # two people: notifications, hosting and joining events, edits, cancelling, inbox settings
 ```
 
 Screenshots land in the folder you pass. Playwright must be installed (`npm i -D playwright`).

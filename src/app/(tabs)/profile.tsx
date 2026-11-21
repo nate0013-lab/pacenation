@@ -142,6 +142,8 @@ export default function ProfileTab() {
             onPress={() => router.push('/settings/privacy')}
           />
           <View style={styles.divider} />
+          <ListRow testID="profile-notifications" icon="bell" label="Notifications" onPress={() => router.push('/settings/notifications')} />
+          <View style={styles.divider} />
           <ListRow testID="profile-account" icon="settings" label="Account" onPress={() => router.push('/settings/account')} />
         </Card>
       </View>
