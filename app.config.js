@@ -10,5 +10,7 @@ module.exports = ({ config }) => {
     ...config,
     scheme: reversed ? [config.scheme, reversed] : config.scheme,
     ios: { ...config.ios, usesAppleSignIn: true },
+    // The web app on GitHub Pages lives under /pacenation.
+    experiments: { ...config.experiments, ...(process.env.EXPO_BASE_URL ? { baseUrl: process.env.EXPO_BASE_URL } : {}) },
   };
 };
