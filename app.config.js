@@ -1,6 +1,6 @@
 /**
  * Adds the values that come from the environment (EAS secrets or a local .env)
- * to app.json: the Android Google Maps key and the iOS Google sign-in callback.
+ * to app.json: the iOS Google sign-in callback. Maps are free OpenFreeMap maps and need no key.
  */
 module.exports = ({ config }) => {
   const iosClient = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '';
@@ -10,9 +10,7 @@ module.exports = ({ config }) => {
     ...config,
     scheme: reversed ? [config.scheme, reversed] : config.scheme,
     ios: { ...config.ios, usesAppleSignIn: true },
-    android: {
-      ...config.android,
-      config: { ...(config.android && config.android.config), googleMaps: { apiKey: process.env.GOOGLE_MAPS_ANDROID_KEY || '' } },
-    },
+    // The web app on GitHub Pages lives under /pacenation.
+    experiments: { ...config.experiments, ...(process.env.EXPO_BASE_URL ? { baseUrl: process.env.EXPO_BASE_URL } : {}) },
   };
 };

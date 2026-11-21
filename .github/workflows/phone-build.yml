@@ -1,0 +1,58 @@
+# Builds an installable Android test app (APK) on Expo's servers under the
+# nate0013-lab Expo account. Run it from the Actions tab ("Run workflow"), or
+# by pushing to the phone-build branch. Needs the EXPO_TOKEN repository secret
+# (expo.dev > Account settings > Access tokens).
+name: Phone test build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile
+        type: choice
+        options: [preview, development]
+        default: preview
+  push:
+    branches: [phone-build]
+
+concurrency:
+  group: phone-build
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check the Expo token is set
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an EXPO_TOKEN repository secret (expo.dev > Account settings > Access tokens)."
+            exit 1
+          fi
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Build the Android app on Expo
+        id: build
+        run: |
+          eas build --platform android --profile "${{ inputs.profile || 'preview' }}" --non-interactive --wait --json > build.json
+          cat build.json
+          url=$(node -e "const b=require('./build.json')[0]; console.log(b.artifacts && (b.artifacts.applicationArchiveUrl || b.artifacts.buildUrl) || '')")
+          page=$(node -e "const b=require('./build.json')[0]; console.log('https://expo.dev/accounts/nate0013-lab/projects/pacenation/builds/' + b.id)")
+          echo "APK_URL=$url" >> "$GITHUB_OUTPUT"
+          {
+            echo "## PaceNation Android test build"
+            echo ""
+            echo "- Install file (APK): $url"
+            echo "- Build page (shows a QR code to install on a phone): $page"
+          } >> "$GITHUB_STEP_SUMMARY"

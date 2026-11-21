@@ -72,7 +72,8 @@
       ],
       "expo-sharing",
       "expo-apple-authentication",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -81,10 +82,13 @@
     "backgroundColor": "#07111F",
     "description": "Where Every Kilometre Matters. Track walks, runs and rides, join challenges and compete with a fitness community.",
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "d08ef9f5-e37c-45f4-a07f-0bcf0e95855c"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "nate0013-lab"
   }
 }

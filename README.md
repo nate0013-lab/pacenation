@@ -102,7 +102,7 @@ Image picking, GPS and native sign-in need a development build
 
 Without `.env` the app talks to the live pacenation-958d2 project.
 
-Android maps need a Google Maps API key, read at build time from `GOOGLE_MAPS_ANDROID_KEY` (see `app.config.js`). iOS uses Apple Maps and needs no key.
+Maps on Android and iPhone are free OpenStreetMap maps from OpenFreeMap (MapLibre), with no API key or billing.
 
 Google and Apple sign-in are configured with the `EXPO_PUBLIC_GOOGLE_*` and `EXPO_PUBLIC_APPLE_SIGN_IN` values in `.env.example`.
 

@@ -19,12 +19,15 @@ describe('social sign-in config', () => {
     jest.resetModules();
   });
 
-  it('hides Google and Apple until configured', () => {
+  it('has Google on the web, and hides phone Google and Apple until configured', () => {
     delete process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    delete process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+    delete process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
     delete process.env.EXPO_PUBLIC_APPLE_SIGN_IN;
     const c = require('../social-auth-config');
-    expect(c.googleEnabled('web')).toBe(false);
+    expect(c.googleEnabled('web')).toBe(true);
     expect(c.googleEnabled('android')).toBe(false);
+    expect(c.googleEnabled('ios')).toBe(false);
     expect(c.appleEnabled('ios')).toBe(false);
   });
 
