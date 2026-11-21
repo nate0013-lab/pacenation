@@ -10,6 +10,7 @@ import { Colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { MyActivitiesProvider } from '@/lib/use-stats';
 import { SocialProvider } from '@/lib/use-social';
+import { NotificationsProvider } from '@/lib/use-notifications';
 // Registers the background location task at start-up and restores an unfinished activity.
 import { restoreSession } from '@/lib/tracking/store';
 
@@ -61,8 +62,10 @@ export default function RootLayout() {
       <AuthProvider>
         <MyActivitiesProvider>
           <SocialProvider>
-            <StatusBar style="light" />
-            <AuthGate />
+            <NotificationsProvider>
+              <StatusBar style="light" />
+              <AuthGate />
+            </NotificationsProvider>
           </SocialProvider>
         </MyActivitiesProvider>
       </AuthProvider>

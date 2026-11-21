@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LogoMark } from '@/components/logo';
 import { ScreenHeader } from '@/components/screen-header';
 import { Banner, Button, Screen, TextField } from '@/components/ui';
+import { SocialSignIn } from '@/components/social-sign-in';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { signUpWithEmail } from '@/lib/auth-service';
 import { authErrorMessage, validateEmail, validatePassword, validatePasswordConfirm } from '@/lib/validation';
@@ -80,6 +81,7 @@ export default function SignUp() {
           error={errors.confirm}
         />
         <Button testID="sign-up-submit" title="Create account" onPress={submit} loading={busy} />
+        <SocialSignIn onError={setFormError} />
         <Button title="Already a member? Sign in" variant="ghost" onPress={() => router.replace('/sign-in')} />
         <Text style={styles.legal}>By creating an account you agree to keep PaceNation a respectful, supportive community.</Text>
       </View>

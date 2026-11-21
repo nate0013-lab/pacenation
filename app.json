@@ -18,7 +18,8 @@
         "UIBackgroundModes": [
           "location"
         ]
-      }
+      },
+      "buildNumber": "1"
     },
     "android": {
       "package": "app.pacenation",
@@ -34,7 +35,8 @@
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 1
     },
     "web": {
       "output": "single",
@@ -68,13 +70,21 @@
           "photosPermission": "PaceNation lets you choose a profile picture from your photos."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-apple-authentication",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "backgroundColor": "#07111F",
-    "description": "Where Every Kilometre Matters. Track walks, runs and rides, join challenges and compete with a fitness community."
+    "description": "Where Every Kilometre Matters. Track walks, runs and rides, join challenges and compete with a fitness community.",
+    "extra": {
+      "eas": {}
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }

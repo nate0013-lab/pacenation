@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 
 import { db } from './firebase';
+import { notify } from './notifications-service';
 import type { StatsSummary } from './progress/sync';
 import type { Activity, UserProfile, Visibility } from './types';
 
@@ -90,9 +91,11 @@ export async function follow(me: string, target: UserProfile): Promise<FollowSta
     b.set(doc(db, 'users', me, 'following', target.uid), { createdAt: serverTimestamp() });
     b.set(doc(db, 'users', target.uid, 'followers', me), { createdAt: serverTimestamp() });
     await b.commit();
+    void notify(target.uid, me, 'follow', {}, `follow-${me}`);
     return 'following';
   }
   await setDoc(doc(db, 'users', target.uid, 'followRequests', me), { createdAt: serverTimestamp() });
+  void notify(target.uid, me, 'follow_request', {}, `request-${me}`);
   return 'requested';
 }
 
@@ -128,6 +131,7 @@ export async function approveRequest(me: string, requester: string): Promise<voi
   b.set(doc(db, 'users', me, 'followers', requester), { createdAt: serverTimestamp() });
   b.delete(doc(db, 'users', me, 'followRequests', requester));
   await b.commit();
+  void notify(requester, me, 'follow_approved', {}, `approved-${me}`);
 }
 
 export async function declineRequest(me: string, requester: string): Promise<void> {
@@ -209,10 +213,12 @@ export async function getReactions(activityId: string, me: string): Promise<Reac
   return { likes: likes.data().count, comments: comments.data().count, likedByMe: mine.exists() };
 }
 
-export async function setLike(activityId: string, me: string, liked: boolean): Promise<void> {
+export async function setLike(activityId: string, me: string, liked: boolean, ownerId?: string): Promise<void> {
   const ref = doc(db, 'activities', activityId, 'likes', me);
-  if (liked) await setDoc(ref, { createdAt: serverTimestamp() });
-  else await deleteDoc(ref);
+  if (liked) {
+    await setDoc(ref, { createdAt: serverTimestamp() });
+    if (ownerId) void notify(ownerId, me, 'cheer', { activityId }, `cheer-${activityId}-${me}`);
+  } else await deleteDoc(ref);
 }
 
 export async function listLikers(activityId: string, max = 100): Promise<string[]> {
@@ -243,10 +249,11 @@ export function watchComments(activityId: string, cb: (list: Comment[]) => void,
   );
 }
 
-export async function addComment(activityId: string, me: string, text: string): Promise<void> {
+export async function addComment(activityId: string, me: string, text: string, ownerId?: string): Promise<void> {
   const clean = text.trim().slice(0, MAX_COMMENT);
   if (!clean) throw new Error('PN:Write something first.');
   await setDoc(doc(collection(db, 'activities', activityId, 'comments')), { authorId: me, text: clean, createdAt: serverTimestamp() });
+  if (ownerId) void notify(ownerId, me, 'comment', { activityId, text: clean });
 }
 
 export async function deleteComment(activityId: string, commentId: string): Promise<void> {

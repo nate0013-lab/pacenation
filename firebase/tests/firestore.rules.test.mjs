@@ -492,17 +492,90 @@ describe('challenges, leaderboards and events', () => {
     await assertFails(setDoc(doc(as('bob'), 'leaderboards', 'all-time-any'), { title: 'x' }));
   });
 
-  test('users register for upcoming events themselves', async () => {
-    await assertSucceeds(setDoc(doc(as('bob'), 'events', 'e1', 'registrations', 'bob'), { registeredAt: serverTimestamp() }));
-    await assertFails(setDoc(doc(as('bob'), 'events', 'e1', 'registrations', 'carol'), { registeredAt: serverTimestamp() }));
-    await assertFails(setDoc(doc(as('bob'), 'events', 'e1'), { title: 'Edited' }));
+;
+});
+
+describe('events', () => {
+  const ev = (extra = {}) => ({
+    ownerId: 'host', ownerName: 'Hana', title: 'Saturday trail run', description: 'Easy pace, all welcome.', sport: 'run',
+    startsAt: Timestamp.fromMillis(Date.now() + 3 * 86400_000), durationMin: 90, distanceM: 10000, meetingPoint: 'Main gate car park',
+    location: { lat: -33.9, lng: 18.4 }, capacity: 20, cancelled: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra,
+  });
+  const attend = (db, uid, id) => {
+    const b = writeBatch(db);
+    b.set(doc(db, 'events', id, 'attendees', uid), { displayName: 'Bob', username: 'bob', joinedAt: serverTimestamp() });
+    b.set(doc(db, 'users', uid, 'events', id), { joinedAt: serverTimestamp(), startsAt: Timestamp.fromMillis(Date.now() + 3 * 86400_000) });
+    return b.commit();
+  };
+
+  test('anyone signed in can host a valid future event as themselves', async () => {
+    await assertSucceeds(setDoc(doc(as('host'), 'events', 'e1'), ev()));
+    await assertFails(setDoc(doc(as('bob'), 'events', 'e2'), ev()));
+    await assertFails(setDoc(doc(as('host'), 'events', 'e3'), ev({ startsAt: Timestamp.fromMillis(Date.now() - 1000) })));
+    await assertFails(setDoc(doc(as('host'), 'events', 'e4'), ev({ title: 'x' })));
+    await assertFails(setDoc(doc(as('host'), 'events', 'e5'), ev({ cancelled: true })));
+    await assertFails(setDoc(doc(anon(), 'events', 'e6'), ev()));
+    await assertSucceeds(getDoc(doc(as('bob'), 'events', 'e1')));
   });
 
-  test('notifications: owner reads and marks read, cannot create', async () => {
-    await seed((db) => setDoc(doc(db, 'users', 'bob', 'notifications', 'n1'), { type: 'follow', read: false }));
-    await assertSucceeds(updateDoc(doc(as('bob'), 'users', 'bob', 'notifications', 'n1'), { read: true }));
-    await assertFails(updateDoc(doc(as('bob'), 'users', 'bob', 'notifications', 'n1'), { type: 'other' }));
-    await assertFails(getDoc(doc(as('carol'), 'users', 'bob', 'notifications', 'n1')));
-    await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'notifications', 'n2'), { type: 'fake' }));
+  test('only the host edits or cancels', async () => {
+    await setDoc(doc(as('host'), 'events', 'e1'), ev());
+    await assertSucceeds(updateDoc(doc(as('host'), 'events', 'e1'), { cancelled: true, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(as('bob'), 'events', 'e1'), { title: 'Mine now', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(as('host'), 'events', 'e1'), { ownerId: 'bob', updatedAt: serverTimestamp() }));
+  });
+
+  test('people join and leave upcoming events themselves; the host can remove them', async () => {
+    await setDoc(doc(as('host'), 'events', 'e1'), ev());
+    await assertSucceeds(attend(as('bob'), 'bob', 'e1'));
+    await assertFails(attend(as('carol'), 'bob', 'e1'));
+    await assertSucceeds(deleteDoc(doc(as('host'), 'events', 'e1', 'attendees', 'bob')));
+    await seed((db) => setDoc(doc(db, 'events', 'past'), { ...ev(), startsAt: Timestamp.fromMillis(Date.now() - 3600_000), createdAt: Timestamp.now(), updatedAt: Timestamp.now() }));
+    await assertFails(attend(as('carol'), 'carol', 'past'));
+    await updateDoc(doc(as('host'), 'events', 'e1'), { cancelled: true, updatedAt: serverTimestamp() });
+    await assertFails(attend(as('carol'), 'carol', 'e1'));
+  });
+});
+
+describe('notifications', () => {
+  const note = (type, extra = {}) => ({ type, fromUid: 'bob', fromName: 'Bob', read: false, createdAt: serverTimestamp(), ...extra });
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'users', 'alice'), { ...card('alice'), createdAt: null, updatedAt: null });
+      await setDoc(doc(db, 'users', 'bob'), { ...card('bob'), createdAt: null, updatedAt: null });
+      await setDoc(doc(db, 'activities', 'a1'), activity('alice', 'public'));
+    });
+  });
+  const inbox = (db, id) => doc(db, 'users', 'alice', 'notifications', id);
+
+  test('owner reads and marks read; nobody else reads', async () => {
+    await seed((db) => setDoc(inbox(db, 'n1'), { ...note('follow'), createdAt: Timestamp.now() }));
+    await assertSucceeds(updateDoc(inbox(as('alice'), 'n1'), { read: true }));
+    await assertFails(updateDoc(inbox(as('alice'), 'n1'), { text: 'edited' }));
+    await assertFails(getDoc(inbox(as('bob'), 'n1')));
+  });
+
+  test('a follow notification needs the follow to exist, in the same batch', async () => {
+    await assertFails(setDoc(inbox(as('bob'), 'follow-bob'), note('follow')));
+    const db = as('bob');
+    const b = writeBatch(db);
+    b.set(doc(db, 'users', 'bob', 'following', 'alice'), { createdAt: serverTimestamp() });
+    b.set(doc(db, 'users', 'alice', 'followers', 'bob'), { createdAt: serverTimestamp() });
+    b.set(inbox(db, 'follow-bob'), note('follow'));
+    await assertSucceeds(b.commit());
+  });
+
+  test('cheers need a real like on the recipient\'s activity; nobody can impersonate', async () => {
+    await assertFails(setDoc(inbox(as('bob'), 'cheer-a1-bob'), note('cheer', { activityId: 'a1' })));
+    const db = as('bob');
+    const b = writeBatch(db);
+    b.set(doc(db, 'activities', 'a1', 'likes', 'bob'), { createdAt: serverTimestamp() });
+    b.set(inbox(db, 'cheer-a1-bob'), note('cheer', { activityId: 'a1' }));
+    await assertSucceeds(b.commit());
+    await assertFails(setDoc(inbox(as('carol'), 'x'), note('comment', { activityId: 'a1' })));
+    await assertSucceeds(setDoc(inbox(as('bob'), 'c1'), note('comment', { activityId: 'a1', text: 'Nice one' })));
+    await assertFails(setDoc(inbox(as('bob'), 'c2'), note('comment', { activityId: 'a1', text: 'x'.repeat(200) })));
+    await assertFails(setDoc(inbox(as('bob'), 'c3'), note('spam')));
+    await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'notifications', 'self'), { ...note('comment', { activityId: 'a1' }) }));
   });
 });

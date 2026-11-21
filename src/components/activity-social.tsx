@@ -62,7 +62,7 @@ export function ActivitySocial({ activityId, ownerId, me }: { activityId: string
     setError(null);
     setSending(true);
     try {
-      await addComment(activityId, me, draft);
+      await addComment(activityId, me, draft, ownerId);
       setDraft('');
       setR((x) => (x ? { ...x, comments: x.comments + 1 } : x));
     } catch (e) {
@@ -88,7 +88,7 @@ export function ActivitySocial({ activityId, ownerId, me }: { activityId: string
       <SectionHeader title="Cheers and comments" />
       <Card style={{ gap: Spacing.md }}>
         <View style={styles.likeRow}>
-          <LikeButton activityId={activityId} me={me} value={r} onChange={setR} />
+          <LikeButton activityId={activityId} me={me} value={r} onChange={setR} ownerId={ownerId} />
           <Text style={[Type.small, { color: Colors.textSecondary, flex: 1 }]} numberOfLines={2} testID="activity-likers">
             {likedBy.length === 0 ? 'Be the first to cheer them on.' : `Cheers from ${likedBy.slice(0, 3).join(', ')}${r && r.likes > 3 ? ` and ${r.likes - 3} more` : ''}`}
           </Text>

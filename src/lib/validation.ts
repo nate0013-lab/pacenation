@@ -66,7 +66,17 @@ const AUTH_ERRORS: Record<string, string> = {
   'auth/network-request-failed': 'No connection. Check your internet and try again.',
   'auth/requires-recent-login': 'For your security, enter your password again.',
   'auth/missing-password': 'Enter your password.',
+  'auth/account-exists-with-different-credential': 'An account with this email already exists. Sign in with your email and password.',
+  'auth/operation-not-allowed': 'This sign-in method is not switched on yet.',
+  'auth/popup-blocked': 'Your browser blocked the sign-in window. Allow pop-ups and try again.',
 };
+
+/** Like authErrorMessage, but returns null when the person simply closed the sign-in window. */
+export function socialErrorMessage(err: unknown): string | null {
+  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code: unknown }).code) : '';
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return null;
+  return authErrorMessage(err);
+}
 
 export function authErrorMessage(err: unknown): string {
   const code = typeof err === 'object' && err && 'code' in err ? String((err as { code: unknown }).code) : '';

@@ -1,5 +1,8 @@
 import {
   EmailAuthProvider,
+  GoogleAuthProvider,
+  OAuthProvider,
+  reauthenticateWithPopup,
   createUserWithEmailAndPassword,
   deleteUser,
   reauthenticateWithCredential,
@@ -8,11 +11,18 @@ import {
   signInWithEmailAndPassword,
   signOut as fbSignOut,
 } from 'firebase/auth';
-import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 import { deleteActivity } from './activities-service';
 import { BOARD_PERIODS, BOARD_SPORTS, boardId } from './leaderboards-service';
+import { Platform } from 'react-native';
+
 import { auth, db } from './firebase';
+
+/** True when the account signs in with an email and password (not only Google or Apple). */
+export function hasPassword(): boolean {
+  return !!auth.currentUser?.providerData.some((p) => p.providerId === 'password');
+}
 
 export async function signUpWithEmail(email: string, password: string) {
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
@@ -38,10 +48,19 @@ export function signOut() {
  * Deletes the signed-in account after confirming the password. Profile
  * documents (including the photo, which lives in the profile) are removed here.
  */
-export async function deleteAccount(password: string, usernameLower: string | null) {
+export async function deleteAccount(password: string | null, usernameLower: string | null) {
   const user = auth.currentUser;
-  if (!user || !user.email) throw new Error('PN:You need to be signed in.');
-  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+  if (!user) throw new Error('PN:You need to be signed in.');
+  if (hasPassword()) {
+    if (!user.email || !password) throw new Error('PN:Enter your password to confirm.');
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+  } else if (Platform.OS === 'web') {
+    const google = user.providerData.some((p) => p.providerId === 'google.com');
+    await reauthenticateWithPopup(user, google ? new GoogleAuthProvider() : new OAuthProvider('apple.com'));
+  } else if (Date.now() - Date.parse(user.metadata.lastSignInTime ?? '0') > 5 * 60_000) {
+    // Google and Apple accounts confirm by signing in again; Firebase needs a recent sign-in to delete.
+    throw new Error('PN:For your security, sign out and sign in again, then delete your account within 5 minutes.');
+  }
   const uid = user.uid;
   // Activities and their routes go first, while the account can still prove it owns them.
   const mine = await getDocs(query(collection(db, 'activities'), where('ownerId', '==', uid)));
@@ -72,6 +91,28 @@ export async function deleteAccount(password: string, usernameLower: string | nu
   });
   for (const p of BOARD_PERIODS) for (const s of BOARD_SPORTS) cleanup.delete(doc(db, 'leaderboards', boardId(p, s), 'entries', uid));
   await cleanup.commit();
+  // Events: places I took at other people's events, then the events I host
+  // (attendee entries first, while the event still names me as host).
+  const myEvents = await getDocs(collection(db, 'users', uid, 'events'));
+  for (const d of myEvents.docs) {
+    await deleteDoc(doc(db, 'events', d.id, 'attendees', uid)).catch(() => undefined);
+    await deleteDoc(d.ref);
+  }
+  const hosted = await getDocs(query(collection(db, 'events'), where('ownerId', '==', uid)));
+  for (const e of hosted.docs) {
+    const people = await getDocs(collection(db, 'events', e.id, 'attendees'));
+    const b = writeBatch(db);
+    people.docs.forEach((p) => b.delete(p.ref));
+    b.delete(e.ref);
+    await b.commit();
+  }
+  // My notifications inbox.
+  const inbox = await getDocs(collection(db, 'users', uid, 'notifications'));
+  for (let i = 0; i < inbox.docs.length; i += 400) {
+    const b = writeBatch(db);
+    inbox.docs.slice(i, i + 400).forEach((n) => b.delete(n.ref));
+    await b.commit();
+  }
   // One batch, so the username is released in the same write that removes the profile.
   const batch = writeBatch(db);
   batch.delete(doc(db, 'stats', uid));

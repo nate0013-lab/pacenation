@@ -28,7 +28,10 @@ export default function ChallengesTab() {
       </View>
       <Text style={styles.sub}>Push your limits solo or move the whole community forward. New challenges start every Monday and on the 1st.</Text>
 
-      <Button testID="open-leaderboards" title="Leaderboards" icon="trophy" variant="secondary" onPress={() => router.push('/leaderboards')} />
+      <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+        <Button testID="open-leaderboards" title="Leaderboards" icon="trophy" variant="secondary" onPress={() => router.push('/leaderboards')} style={{ flex: 1 }} />
+        <Button testID="open-events" title="Events" icon="calendar" variant="secondary" onPress={() => router.push('/events')} style={{ flex: 1 }} />
+      </View>
 
       <SectionHeader title="Your challenges" />
       {active.length === 0 ? (

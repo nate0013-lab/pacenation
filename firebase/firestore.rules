@@ -24,6 +24,34 @@ service cloud.firestore {
     function profileVisible(uid) {
       return canSee(uid, get(/databases/$(database)/documents/users/$(uid)).data.privacy.profileVisibility);
     }
+    function validNotification(to, n) {
+      let from = request.auth.uid;
+      return n.keys().hasOnly(['type', 'fromUid', 'fromName', 'activityId', 'eventId', 'text', 'read', 'createdAt'])
+        && n.fromUid == from && from != to
+        && n.fromName is string && n.fromName.size() <= 40
+        && n.read == false
+        && n.createdAt == request.time
+        && (!('text' in n) || (n.text is string && n.text.size() <= 140))
+        && (
+          (n.type == 'follow'
+            && existsAfter(/databases/$(database)/documents/users/$(to)/followers/$(from)))
+          || (n.type == 'follow_request'
+            && existsAfter(/databases/$(database)/documents/users/$(to)/followRequests/$(from)))
+          || (n.type == 'follow_approved'
+            && existsAfter(/databases/$(database)/documents/users/$(from)/followers/$(to)))
+          || (n.type == 'cheer' && n.activityId is string
+            && get(/databases/$(database)/documents/activities/$(n.activityId)).data.ownerId == to
+            && existsAfter(/databases/$(database)/documents/activities/$(n.activityId)/likes/$(from)))
+          || (n.type == 'comment' && n.activityId is string
+            && get(/databases/$(database)/documents/activities/$(n.activityId)).data.ownerId == to)
+          || (n.type == 'event_join' && n.eventId is string
+            && get(/databases/$(database)/documents/events/$(n.eventId)).data.ownerId == to
+            && existsAfter(/databases/$(database)/documents/events/$(n.eventId)/attendees/$(from)))
+          || ((n.type == 'event_cancelled' || n.type == 'event_updated') && n.eventId is string
+            && get(/databases/$(database)/documents/events/$(n.eventId)).data.ownerId == from
+            && exists(/databases/$(database)/documents/events/$(n.eventId)/attendees/$(to)))
+        );
+    }
     function changedOnly(keys) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
@@ -161,10 +189,23 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Events I am going to, written together with my attendee entry.
+      match /events/{eventId} {
+        allow read, delete: if isUser(uid);
+        allow create: if isUser(uid)
+          && request.resource.data.keys().hasOnly(['joinedAt', 'startsAt'])
+          && request.resource.data.joinedAt == request.time
+          && request.resource.data.startsAt is timestamp
+          && existsAfter(/databases/$(database)/documents/events/$(eventId)/attendees/$(uid));
+        allow update: if false;
+      }
+
+      // In-app notifications. With no server, the person who caused one writes it,
+      // and each type must match something that really happened.
       match /notifications/{notificationId} {
         allow read, delete: if isUser(uid);
         allow update: if isUser(uid) && changedOnly(['read']) && request.resource.data.read is bool;
-        allow create: if false;
+        allow create: if signedIn() && validNotification(uid, request.resource.data);
       }
     }
 
@@ -340,17 +381,50 @@ service cloud.firestore {
     }
 
     // ---------- events ----------
+    // Group walks, runs and rides that anyone can host. Events are public to
+    // signed-in users; the host edits or cancels, everyone else joins or leaves.
+    function validEvent(d) {
+      return d.keys().hasOnly(['ownerId', 'ownerName', 'title', 'description', 'sport', 'startsAt', 'durationMin',
+               'distanceM', 'meetingPoint', 'location', 'capacity', 'cancelled', 'createdAt', 'updatedAt'])
+        && d.title is string && d.title.size() >= 3 && d.title.size() <= 60
+        && d.description is string && d.description.size() <= 1000
+        && d.sport in ['walk', 'run', 'ride']
+        && d.startsAt is timestamp
+        && d.durationMin is int && d.durationMin >= 15 && d.durationMin <= 720
+        && (d.distanceM == null || (d.distanceM is int && d.distanceM > 0 && d.distanceM <= 300000))
+        && d.meetingPoint is string && d.meetingPoint.size() >= 3 && d.meetingPoint.size() <= 120
+        && (d.location == null || (d.location.lat is number && d.location.lng is number))
+        && (d.capacity == null || (d.capacity is int && d.capacity >= 2 && d.capacity <= 500))
+        && d.cancelled is bool
+        && d.ownerName is string && d.ownerName.size() <= 40;
+    }
     match /events/{eventId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && validEvent(request.resource.data)
+        && request.resource.data.cancelled == false
+        && request.resource.data.startsAt > request.time
+        && request.resource.data.startsAt < request.time + duration.value(366, 'd')
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isUser(resource.data.ownerId)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validEvent(request.resource.data)
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isUser(resource.data.ownerId) || isAdmin();
 
-      match /registrations/{registrantId} {
+      match /attendees/{attendeeId} {
         allow read: if signedIn();
-        allow create: if isUser(registrantId)
-          && request.resource.data.keys().hasOnly(['registeredAt'])
-          && request.resource.data.registeredAt == request.time
-          && get(/databases/$(database)/documents/events/$(eventId)).data.startsAt > request.time;
-        allow delete: if isUser(registrantId);
+        allow create: if isUser(attendeeId)
+          && request.resource.data.keys().hasOnly(['displayName', 'username', 'joinedAt'])
+          && validEntryName(request.resource.data)
+          && request.resource.data.joinedAt == request.time
+          && get(/databases/$(database)/documents/events/$(eventId)).data.startsAt > request.time
+          && get(/databases/$(database)/documents/events/$(eventId)).data.cancelled == false;
+        // Leaving, or the host removing someone.
+        allow delete: if isUser(attendeeId) || isUser(get(/databases/$(database)/documents/events/$(eventId)).data.ownerId);
         allow update: if false;
       }
     }

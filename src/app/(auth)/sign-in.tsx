@@ -5,6 +5,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { LogoMark } from '@/components/logo';
 import { ScreenHeader } from '@/components/screen-header';
 import { Banner, Button, Screen, TextField } from '@/components/ui';
+import { SocialSignIn } from '@/components/social-sign-in';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { signInWithEmail } from '@/lib/auth-service';
 import { authErrorMessage, validateEmail } from '@/lib/validation';
@@ -72,6 +73,7 @@ export default function SignIn() {
           Forgot password?
         </Link>
         <Button testID="sign-in-submit" title="Sign in" onPress={submit} loading={busy} />
+        <SocialSignIn onError={setFormError} />
         <Button title="New here? Create an account" variant="ghost" onPress={() => router.replace('/sign-up')} />
       </View>
     </Screen>
