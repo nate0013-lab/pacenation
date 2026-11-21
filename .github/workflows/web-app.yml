@@ -1,6 +1,7 @@
 # Publishes the web version of PaceNation to GitHub Pages
 # (https://nate0013-lab.github.io/pacenation/) so it can be opened in Safari
 # or Chrome on any phone. Run it from the Actions tab or push to web-app.
+# GitHub Pages must be set to deploy from the gh-pages branch (Settings > Pages).
 name: Web app
 
 on:
@@ -9,9 +10,7 @@ on:
     branches: [web-app]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -35,15 +34,12 @@ jobs:
           npx expo export -p web --output-dir dist
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to the gh-pages branch
+        run: |
+          cd dist
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Web app from ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
