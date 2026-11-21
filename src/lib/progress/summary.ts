@@ -66,7 +66,8 @@ function addDays(d: Date, n: number): Date {
 const DAY_LETTER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function computeProgress(list: ProgressActivity[], now: Date = new Date()): Progress {
+/** `challengeCompletions`: when each completed individual challenge was finished (epoch ms). */
+export function computeProgress(list: ProgressActivity[], now: Date = new Date(), challengeCompletions: number[] = []): Progress {
   const acts = [...list].sort((a, b) => a.startedAt.toMillis() - b.startedAt.toMillis());
   const stats: UserStats = {
     totals: { ...EMPTY_TOTALS },
@@ -77,9 +78,9 @@ export function computeProgress(list: ProgressActivity[], now: Date = new Date()
   const tally: Tally = {
     count: 0, distanceM: 0, climbM: 0, sports: new Set(), bestStreak: 0,
     last: { sport: 'walk', distanceM: 0, climbM: 0, hour: 12 },
-    longest: { walk: 0, run: 0, ride: 0 }, biggestClimb: 0, early: 0, late: 0,
+    longest: { walk: 0, run: 0, ride: 0 }, biggestClimb: 0, early: 0, late: 0, challenges: 0,
   };
-  const badgeState = new Map<string, { earnedAt: number; activityId: string }>();
+  const badgeState = new Map<string, { earnedAt: number; activityId: string | null }>();
   const days = new Map<string, number>();
   const records = new Map<string, PersonalRecord>();
   let activityXp = 0;
@@ -134,6 +135,7 @@ export function computeProgress(list: ProgressActivity[], now: Date = new Date()
     tally.last = { sport: a.sport, distanceM: a.distanceM, climbM: climb, hour };
 
     for (const b of BADGES) {
+      if (b.category === 'Challenges') continue;
       if (!badgeState.has(b.id) && isEarned(b, tally)) badgeState.set(b.id, { earnedAt: ms, activityId: a.id });
     }
 
@@ -157,6 +159,15 @@ export function computeProgress(list: ProgressActivity[], now: Date = new Date()
   while (days.has(dayKey(cursor.getTime()))) {
     currentStreak++;
     cursor = addDays(cursor, -1);
+  }
+
+  // Challenge badges: the k-th completed challenge unlocks the badge that needs k.
+  const done = [...challengeCompletions].sort((x, y) => x - y);
+  tally.challenges = done.length;
+  for (const b of BADGES) {
+    if (b.category !== 'Challenges') continue;
+    const need = b.progress(tally).target;
+    if (done.length >= need) badgeState.set(b.id, { earnedAt: done[need - 1], activityId: null });
   }
 
   const badges: BadgeState[] = BADGES.map((b) => {

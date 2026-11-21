@@ -145,6 +145,17 @@ service cloud.firestore {
         allow update: if false;
       }
 
+      // Challenges I joined, written together with my participant entry.
+      match /challenges/{challengeId} {
+        allow read, delete: if isUser(uid);
+        allow create: if isUser(uid)
+          && request.resource.data.keys().hasOnly(['joinedAt', 'endsAt'])
+          && request.resource.data.joinedAt == request.time
+          && request.resource.data.endsAt is timestamp
+          && existsAfter(/databases/$(database)/documents/challenges/$(challengeId)/participants/$(uid));
+        allow update: if false;
+      }
+
       match /feed/{activityId} {
         allow read: if isUser(uid);
         allow write: if false;
@@ -265,29 +276,62 @@ service cloud.firestore {
     }
 
     // ---------- challenges ----------
+    // The challenges themselves are a catalogue built into the app; ids look like
+    // `run-25-2026-W47` or `ride-400-2026-11`. Each person writes their own entry,
+    // and their device keeps its progress in step with their activities.
+    function validChallengeId(id) {
+      return id.matches('^[a-z0-9-]+-[0-9]{4}-(W[0-9]{2}|[0-9]{2})$') && id.size() <= 60;
+    }
+    function validEntryName(d) {
+      return d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 40
+        && d.username is string && d.username.size() <= 20;
+    }
     match /challenges/{challengeId} {
       allow read: if signedIn();
       allow write: if isAdmin();
 
       match /participants/{participantId} {
         allow read: if signedIn();
-        allow create: if isUser(participantId)
-          && request.resource.data.keys().hasOnly(['joinedAt', 'progressM', 'displayName', 'photoURL'])
-          && request.resource.data.progressM == 0
+        allow create: if isUser(participantId) && validChallengeId(challengeId)
+          && request.resource.data.keys().hasOnly(['displayName', 'username', 'progress', 'endsAt', 'joinedAt', 'updatedAt'])
+          && validEntryName(request.resource.data)
+          && request.resource.data.progress == 0
+          && request.resource.data.endsAt is timestamp
+          && request.resource.data.endsAt > request.time
+          && request.resource.data.endsAt < request.time + duration.value(32, 'd')
           && request.resource.data.joinedAt == request.time
-          && get(/databases/$(database)/documents/challenges/$(challengeId)).data.endsAt > request.time;
+          && request.resource.data.updatedAt == request.time;
+        // Progress keeps syncing for 3 days after the end, for activities saved offline.
+        allow update: if isUser(participantId)
+          && changedOnly(['displayName', 'username', 'progress', 'updatedAt'])
+          && validEntryName(request.resource.data)
+          && request.resource.data.progress is int
+          && request.resource.data.progress >= 0 && request.resource.data.progress <= 100000000
+          && request.resource.data.updatedAt == request.time
+          && resource.data.endsAt + duration.value(3, 'd') > request.time;
         allow delete: if isUser(participantId);
-        allow update: if false;
       }
     }
 
-    // ---------- leaderboards and badge catalogue (functions and admins) ----------
+    // ---------- leaderboards ----------
+    // Board ids: `week-2026-W47-run`, `month-2026-11-any`, `all-time-ride`. People
+    // write only their own entry, and only while they show on leaderboards.
     match /leaderboards/{boardId} {
       allow read: if signedIn();
       allow write: if false;
       match /entries/{entryId} {
         allow read: if signedIn();
-        allow write: if false;
+        allow create, update: if isUser(entryId)
+          && boardId.matches('^(week-[0-9]{4}-W[0-9]{2}|month-[0-9]{4}-[0-9]{2}|all-time)-(any|walk|run|ride)$')
+          && get(/databases/$(database)/documents/users/$(entryId)).data.privacy.showOnLeaderboards == true
+          && request.resource.data.keys().hasOnly(['displayName', 'username', 'level', 'distanceM', 'count', 'updatedAt'])
+          && validEntryName(request.resource.data)
+          && request.resource.data.level is int
+          && request.resource.data.distanceM is int
+          && request.resource.data.distanceM > 0 && request.resource.data.distanceM <= 100000000
+          && request.resource.data.count is int && request.resource.data.count > 0
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isUser(entryId);
       }
     }
     match /badges/{badgeId} {

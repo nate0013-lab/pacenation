@@ -28,7 +28,7 @@ let n = 0;
   await tid('create-profile-submit').click();
   step('home'); await tid('home-welcome').waitFor({ timeout: 20000 }); await shot('home'); await shot('home-full', true);
   step('quick start ride'); await ctx.grantPermissions(['geolocation']); await tid('quick-ride').click(); await page.waitForURL(/track/); await tid('track-start').waitFor(); await page.waitForTimeout(800); const bc = await tid('track-sport-ride').evaluate((e) => getComputedStyle(e).borderTopColor); if (bc !== 'rgb(255, 201, 74)') throw new Error('ride not preselected: ' + bc); await tid('track-close').click(); await page.getByRole('tab', { name: /Activity/ }).click(); await tid('activity-start').waitFor(); await shot('activity');
-  step('challenges'); await page.getByRole('tab', { name: /Challenges/ }).click(); await page.getByText('No challenges are live right now').filter({ visible: true }).first().waitFor(); await shot('challenges');
+  step('challenges'); await page.getByRole('tab', { name: /Challenges/ }).click(); await page.getByText('Join a challenge').filter({ visible: true }).first().waitFor(); await shot('challenges');
   step('community'); await page.getByRole('tab', { name: /Community/ }).click(); await tid('community-search').fill('trail'); await page.locator('[data-testid^="search-result-trail_alex"]:visible').first().waitFor({ timeout: 10000 }); await shot('community-search');
   step('profile'); await page.getByRole('tab', { name: /Profile/ }).click(); await tid('profile-name').waitFor(); await shot('profile'); await shot('profile-full', true);
   step('edit profile'); await tid('profile-edit').click(); await tid('edit-profile-save').waitFor(); await page.waitForTimeout(800);

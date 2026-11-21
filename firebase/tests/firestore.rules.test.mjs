@@ -434,22 +434,62 @@ describe('challenges, leaderboards and events', () => {
     });
   });
 
-  test('users join open challenges with zero progress only', async () => {
-    const join = { joinedAt: serverTimestamp(), progressM: 0, displayName: 'Bob', photoURL: null };
-    await assertSucceeds(setDoc(doc(as('bob'), 'challenges', 'open', 'participants', 'bob'), join));
-    await assertFails(setDoc(doc(as('bob'), 'challenges', 'done', 'participants', 'bob'), join));
-    await assertFails(setDoc(doc(as('carol'), 'challenges', 'open', 'participants', 'carol'), { ...join, progressM: 99999 }));
-    await assertFails(setDoc(doc(as('carol'), 'challenges', 'open', 'participants', 'bob'), join));
+  const entry = (extra = {}) => ({
+    displayName: 'Bob', username: 'bob', progress: 0,
+    endsAt: Timestamp.fromMillis(Date.now() + 3 * 86400_000), joinedAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra,
+  });
+  const join = (db, uid, id, extra) => {
+    const b = writeBatch(db);
+    b.set(doc(db, 'challenges', id, 'participants', uid), entry(extra));
+    b.set(doc(db, 'users', uid, 'challenges', id), { joinedAt: serverTimestamp(), endsAt: Timestamp.fromMillis(Date.now() + 3 * 86400_000) });
+    return b.commit();
+  };
+
+  test('people join catalogue challenges with zero progress, for themselves only', async () => {
+    await assertSucceeds(join(as('bob'), 'bob', 'run-25-2026-W47'));
+    await assertFails(join(as('carol'), 'carol', 'run-25-2026-W48', { progress: 99999 }));
+    await assertFails(join(as('carol'), 'bob', 'run-25-2026-W48'));
+    await assertFails(join(as('carol'), 'carol', 'not a challenge'));
+    await assertFails(join(as('carol'), 'carol', 'run-25-2026-W49', { endsAt: Timestamp.fromMillis(Date.now() - 1000) }));
+    await assertFails(setDoc(doc(as('carol'), 'users', 'carol', 'challenges', 'run-25-2026-W47'), { joinedAt: serverTimestamp(), endsAt: Timestamp.now() }));
   });
 
-  test('only admins create challenges', async () => {
+  test('progress is updated by its owner only, as a whole number', async () => {
+    await join(as('bob'), 'bob', 'run-25-2026-W47');
+    const ref = (db) => doc(db, 'challenges', 'run-25-2026-W47', 'participants', 'bob');
+    await assertSucceeds(updateDoc(ref(as('bob')), { progress: 12500, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref(as('bob')), { progress: -5, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref(as('bob')), { progress: 12.5, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref(as('bob')), { endsAt: Timestamp.fromMillis(Date.now() + 90 * 86400_000), updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref(as('carol')), { progress: 0, updatedAt: serverTimestamp() }));
+    await assertSucceeds(getDoc(ref(as('carol'))));
+  });
+
+  test('progress stops syncing three days after a challenge ends', async () => {
+    await seed((db) => setDoc(doc(db, 'challenges', 'run-25-2026-W40', 'participants', 'bob'), { ...entry({ endsAt: Timestamp.fromMillis(Date.now() - 4 * 86400_000) }), joinedAt: Timestamp.now(), updatedAt: Timestamp.now() }));
+    await assertFails(updateDoc(doc(as('bob'), 'challenges', 'run-25-2026-W40', 'participants', 'bob'), { progress: 100, updatedAt: serverTimestamp() }));
+  });
+
+  test('only admins create challenge documents', async () => {
     await assertFails(setDoc(doc(as('bob'), 'challenges', 'x'), { title: 'Mine' }));
     await assertSucceeds(setDoc(doc(as('boss', { admin: true }), 'challenges', 'x'), { title: 'Official' }));
   });
 
-  test('leaderboards are read-only from devices', async () => {
-    await assertSucceeds(getDoc(doc(as('bob'), 'leaderboards', 'w-2026-47_run', 'entries', 'bob')));
-    await assertFails(setDoc(doc(as('bob'), 'leaderboards', 'w-2026-47_run', 'entries', 'bob'), { distanceM: 1e9 }));
+  test('leaderboard entries: own entry only, and only when shown on leaderboards', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'users', 'bob'), { ...card('bob'), createdAt: null, updatedAt: null });
+      await setDoc(doc(db, 'users', 'hidden'), { ...card('hidden'), privacy: { ...PRIVACY, showOnLeaderboards: false }, createdAt: null, updatedAt: null });
+    });
+    const e = (extra = {}) => ({ displayName: 'Bob', username: 'bob', level: 2, distanceM: 12000, count: 2, updatedAt: serverTimestamp(), ...extra });
+    await assertSucceeds(setDoc(doc(as('bob'), 'leaderboards', 'week-2026-W47-run', 'entries', 'bob'), e()));
+    await assertSucceeds(getDoc(doc(as('carol'), 'leaderboards', 'week-2026-W47-run', 'entries', 'bob')));
+    await assertFails(setDoc(doc(as('carol'), 'leaderboards', 'week-2026-W47-run', 'entries', 'bob'), e()));
+    await assertFails(setDoc(doc(as('bob'), 'leaderboards', 'my-own-board', 'entries', 'bob'), e()));
+    await assertFails(setDoc(doc(as('bob'), 'leaderboards', 'all-time-any', 'entries', 'bob'), e({ distanceM: 1.5 })));
+    await assertFails(setDoc(doc(as('bob'), 'leaderboards', 'all-time-any', 'entries', 'bob'), e({ extra: 1 })));
+    await assertFails(setDoc(doc(as('hidden'), 'leaderboards', 'all-time-any', 'entries', 'hidden'), e({ displayName: 'H', username: 'hidden' })));
+    await assertSucceeds(deleteDoc(doc(as('hidden'), 'leaderboards', 'all-time-any', 'entries', 'hidden')));
+    await assertFails(setDoc(doc(as('bob'), 'leaderboards', 'all-time-any'), { title: 'x' }));
   });
 
   test('users register for upcoming events themselves', async () => {

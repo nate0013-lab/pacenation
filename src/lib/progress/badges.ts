@@ -5,7 +5,7 @@
 import type { Sport } from '../types';
 
 export type BadgeTier = 'bronze' | 'silver' | 'gold';
-export type BadgeIcon = 'flag' | 'route' | 'run' | 'walk' | 'ride' | 'flame' | 'calendar' | 'mountain' | 'sun' | 'moon' | 'compass';
+export type BadgeIcon = 'flag' | 'route' | 'run' | 'walk' | 'ride' | 'flame' | 'calendar' | 'mountain' | 'sun' | 'moon' | 'compass' | 'trophy';
 
 export const TIER_XP: Record<BadgeTier, number> = { bronze: 100, silver: 250, gold: 500 };
 
@@ -23,18 +23,20 @@ export interface Tally {
   biggestClimb: number;
   early: number;
   late: number;
+  /** Individual challenges completed (worked out separately, see computeProgress). */
+  challenges: number;
 }
 
 export interface BadgeDef {
   id: string;
   name: string;
   description: string;
-  category: 'Milestones' | 'Distance' | 'Consistency' | 'Explorer';
+  category: 'Milestones' | 'Distance' | 'Consistency' | 'Explorer' | 'Challenges';
   tier: BadgeTier;
   icon: BadgeIcon;
   /** Progress towards the badge as current / target, in the given unit. */
   progress: (t: Tally) => { current: number; target: number };
-  unit?: 'km' | 'm' | 'days' | 'activities' | 'sports';
+  unit?: 'km' | 'm' | 'days' | 'activities' | 'sports' | 'challenges';
 }
 
 const km = (m: number) => m / 1000;
@@ -92,6 +94,9 @@ export const BADGES: BadgeDef[] = [
   { id: 'early-riser', name: 'Early Riser', description: 'Start an activity before 7 AM.', category: 'Explorer', tier: 'bronze', icon: 'sun', progress: (t) => ({ current: t.early, target: 1 }) },
   { id: 'night-owl', name: 'Night Owl', description: 'Start an activity after 9 PM.', category: 'Explorer', tier: 'bronze', icon: 'moon', progress: (t) => ({ current: t.late, target: 1 }) },
   { id: 'climb-500', name: 'Hill Seeker', description: 'Climb 500 m or more in a single activity.', category: 'Explorer', tier: 'silver', icon: 'mountain', unit: 'm', progress: (t) => ({ current: t.biggestClimb, target: 500 }) },
+  { id: 'challenge-1', name: 'Challenge Accepted', description: 'Complete your first challenge.', category: 'Challenges', tier: 'bronze', icon: 'trophy', unit: 'challenges', progress: (t) => ({ current: t.challenges, target: 1 }) },
+  { id: 'challenge-5', name: 'Challenge Hunter', description: 'Complete 5 challenges.', category: 'Challenges', tier: 'silver', icon: 'trophy', unit: 'challenges', progress: (t) => ({ current: t.challenges, target: 5 }) },
+  { id: 'challenge-20', name: 'Challenge Champion', description: 'Complete 20 challenges.', category: 'Challenges', tier: 'gold', icon: 'trophy', unit: 'challenges', progress: (t) => ({ current: t.challenges, target: 20 }) },
   { id: 'climb-total-5000', name: 'Mountain Legs', description: 'Climb 5,000 m in total.', category: 'Explorer', tier: 'gold', icon: 'mountain', unit: 'm', progress: (t) => ({ current: t.climbM, target: 5000 }) },
 ];
 

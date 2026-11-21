@@ -11,6 +11,7 @@ import {
 import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 import { deleteActivity } from './activities-service';
+import { BOARD_PERIODS, BOARD_SPORTS, boardId } from './leaderboards-service';
 import { auth, db } from './firebase';
 
 export async function signUpWithEmail(email: string, password: string) {
@@ -62,6 +63,15 @@ export async function deleteAccount(password: string, usernameLower: string | nu
   });
   requests.docs.forEach((d) => edges.delete(d.ref));
   if (following.size + followers.size + requests.size > 0) await edges.commit();
+  // Challenge entries and leaderboard places.
+  const joined = await getDocs(collection(db, 'users', uid, 'challenges'));
+  const cleanup = writeBatch(db);
+  joined.docs.forEach((d) => {
+    cleanup.delete(d.ref);
+    cleanup.delete(doc(db, 'challenges', d.id, 'participants', uid));
+  });
+  for (const p of BOARD_PERIODS) for (const s of BOARD_SPORTS) cleanup.delete(doc(db, 'leaderboards', boardId(p, s), 'entries', uid));
+  await cleanup.commit();
   // One batch, so the username is released in the same write that removes the profile.
   const batch = writeBatch(db);
   batch.delete(doc(db, 'stats', uid));
